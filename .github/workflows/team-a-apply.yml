@@ -1,0 +1,22 @@
+name: Team A - Apply Terraform
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - .github/workflows/team-a-apply.yml
+      - terraform/team-a/**
+      - terraform/modules/**
+  workflow_dispatch:
+
+jobs:
+  call-apply-terraform:
+    uses: ./.github/workflows/terraform-apply.yml
+    secrets: inherit
+    with:
+      terraform-folder: team-a
+      state-key-secret-name: "TEAM_A_STATEKEY"
+      octopus-apikey-secret-name: "TEAM_A_APIKEY"
+    permissions:
+      id-token: write
+      contents: read

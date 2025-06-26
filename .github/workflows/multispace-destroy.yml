@@ -1,0 +1,16 @@
+name: Multispace - Destroy Terraform
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-apply-terraform:
+    uses: ./.github/workflows/terraform-destroy.yml
+    secrets: inherit
+    with:
+      terraform-folder: multispace
+      state-key-secret-name: "TFSTATE_KEY"
+      octopus-apikey-secret-name: "OCTOPUS_APIKEY"
+    permissions:
+      id-token: write
+      contents: read
