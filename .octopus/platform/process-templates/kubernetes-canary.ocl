@@ -513,10 +513,14 @@ step "delete-canary-deployment" {
 
 step "detect-cancelled-canary" {
     name = "Detect cancelled canary rollout"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+    }
 
     action "detect-cancelled-canary-rollout" {
         action_type = "Octopus.Script"
         properties = {
+            Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
