@@ -233,3 +233,332 @@ step "canary-phase-1-waiting-period" {
         worker_pool_variable = ""
     }
 }
+
+step "approve-canary-phase-1" {
+    name = "Approve canary phase 1"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Approve canary phase 1"
+            Octopus.Action.RunOnServer = "false"
+        }
+    }
+}
+
+step "deploy-canary-phase-2" {
+    name = "Deploy canary phase 2"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $deployment = $OctopusParameters["Project.Deployment.Name"] + "-canary"
+                
+                kubectl scale --current-replicas=1 --replicas=3 deployment/$deployment
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "canary-phase-2-waiting-period" {
+    name = "Canary phase 2 waiting period"
+
+    action {
+        action_type = "Octopus.Script"
+        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
+                
+                Start-Sleep -Seconds $seconds
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "approve-canary-phase-2" {
+    name = "Approve canary phase 2"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Approve canary phase 2"
+            Octopus.Action.RunOnServer = "false"
+        }
+    }
+}
+
+step "deploy-canary-phase-3" {
+    name = "Deploy canary phase 3"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Continue"
+                
+                $deployment = $OctopusParameters["Project.Deployment.Name"]
+                
+                kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
+                
+                $LastExitCode = 0
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "canary-phase-3-waiting-period" {
+    name = "Canary phase 3 waiting period"
+
+    action {
+        action_type = "Octopus.Script"
+        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
+                
+                Start-Sleep -Seconds $seconds
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "approve-canary-phase-3" {
+    name = "Approve canary phase 3"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Approve canary phase 2"
+            Octopus.Action.RunOnServer = "false"
+        }
+    }
+}
+
+step "update-main-products-app-service" {
+    name = "Update main products app service"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: #{Project.Deployment.Name}
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      component: #{Project.Labels.Component}
+                      type: main
+                  template:
+                    metadata:
+                      labels:
+                        component: #{Project.Labels.Component}
+                        type: main
+                    spec:
+                      containers:
+                        - name: web
+                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
+                          ports:
+                            - containerPort: 8080
+                              name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+
+        packages "octopub-frontend" {
+            acquisition_location = "NotAcquired"
+            feed = "docker-hub"
+            package_id = "octopussamples/octopub-frontend"
+            properties = {
+                Extract = "False"
+                Purpose = ""
+                SelectionMode = "immediate"
+            }
+        }
+    }
+}
+
+step "remove-canary-pods-from-service" {
+    name = "Remove canary pods from service"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: octopub-frontend-cluster-ip
+                  labels:
+                    component: #{Project.Labels.Component}
+                spec:
+                  type: ClusterIP
+                  selector:
+                    component: #{Project.Labels.Component}
+                    type: main
+                  ports:
+                    - port: 8080
+                      targetPort: 8080
+                      name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "delete-canary-deployment" {
+    name = "Delete canary deployment"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: #{Project.Deployment.Name}-canary
+                spec:
+                  replicas: 0
+                  selector:
+                    matchLabels:
+                      component: #{Project.Labels.Component}
+                      type: canary
+                  template:
+                    metadata:
+                      labels:
+                        component: #{Project.Labels.Component}
+                        type: canary
+                    spec:
+                      containers:
+                        - name: web
+                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
+                          ports:
+                            - containerPort: 8080
+                              name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "detect-cancelled-canary" {
+    name = "Detect cancelled canary rollout"
+
+    action "detect-cancelled-canary-rollout" {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Continue"
+                
+                if ("#{Octopus.Action[Approve canary phase 1].Output.Manual.Approved}" -ieq "false" -or
+                	"#{Octopus.Action[Approve canary phase 2].Output.Manual.Approved}" -ieq "false" -or
+                	"#{Octopus.Action[Approve canary phase 3].Output.Manual.Approved}" -ieq "false") {
+                	Set-OctopusVariable -name "Cancelled" -value "True"
+                    Write-Highlight "Deployment was cancelled by a manual intervention."
+                } else {
+                	Set-OctopusVariable -name "Cancelled" -value "False"
+                    Write-Highlight "Deployment completed successfully, so no rollback required."
+                }
+                
+                $LastExitCode = 0
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "rollback-canary-deployment" {
+    condition = "Variable"
+    name = "Rollback canary deployment"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Step.ConditionVariableExpression = "#{Octopus.Action[Detect cancelled canary rollout].Output.Cancelled}"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Continue"
+                
+                if ("#{Octopus.Action[Detect cancelled canary rollout].Output.Cancelled}" -ieq "true") {
+                
+                	$deployment = $OctopusParameters["Project.Deployment.Name"]
+                	$canary = $deployment + "-canary"
+                
+                	kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
+                
+                    kubectl delete deployment $canary
+                }
+                
+                $LastExitCode = 0
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
