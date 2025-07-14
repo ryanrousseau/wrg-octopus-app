@@ -6,6 +6,14 @@ icon {
     id = "crow"
 }
 
+parameter "Template.Kubernetes.Canary.Production" {
+    display_settings = {
+        Octopus.ControlType = "Environments"
+    }
+    help_text = ""
+    label = "Production environment"
+}
+
 parameter "Template.Kubernetes.Canary.Tag" {
     display_settings = {
         Octopus.ControlType = "TargetTags"
@@ -16,6 +24,9 @@ parameter "Template.Kubernetes.Canary.Tag" {
 
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
 
     action {
         action_type = "Octopus.KubernetesRunScript"
@@ -42,6 +53,180 @@ step "create-namespace-if-it-does-not-exist" {
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "create-products-app-service" {
+    name = "Create frontend app service"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action "create-frontend-app-service" {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: octopub-frontend-cluster-ip
+                  labels:
+                    component: #{Project.Labels.Component}
+                    type: main
+                spec:
+                  type: ClusterIP
+                  selector:
+                    component: #{Project.Labels.Component}
+                  ports:
+                    - port: 8080
+                      targetPort: 8080
+                      name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "scale-up-existing-deployment" {
+    name = "Scale up existing deployment"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Continue"
+                
+                $deployment = $OctopusParameters["Project.Deployment.Name"]
+                
+                kubectl scale --current-replicas=1 --replicas=3 deployment/$deployment
+                
+                $LastExitCode = 0
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "deploy-products-deployment" {
+    name = "Deploy canary phase 1"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action "deploy-canary-phase-1" {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "360"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: #{Project.Deployment.Name}-canary
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      component: #{Project.Labels.Component}
+                      type: canary
+                  template:
+                    metadata:
+                      labels:
+                        component: #{Project.Labels.Component}
+                        type: canary
+                    spec:
+                      containers:
+                        - name: web
+                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
+                          ports:
+                            - containerPort: 8080
+                              name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "*.yaml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Package.JsonConfigurationVariablesTargets = "**/*.{yml,yaml}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+
+        packages "octopub-frontend" {
+            acquisition_location = "NotAcquired"
+            feed = "docker-hub"
+            package_id = "octopussamples/octopub-frontend"
+            properties = {
+                Extract = "False"
+                Purpose = ""
+                SelectionMode = "immediate"
+            }
+        }
+    }
+}
+
+step "add-canary-pods-to-service" {
+    name = "Add canary pods to service"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: octopub-frontend-cluster-ip
+                  labels:
+                    component: #{Project.Labels.Component}
+                spec:
+                  type: ClusterIP
+                  selector:
+                    component: #{Project.Labels.Component}
+                  ports:
+                    - port: 8080
+                      targetPort: 8080
+                      name: http-port
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "canary-phase-1-waiting-period" {
+    name = "Canary phase 1 waiting period"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
+                
+                Start-Sleep -Seconds $seconds
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
         }
         worker_pool_variable = ""
     }
