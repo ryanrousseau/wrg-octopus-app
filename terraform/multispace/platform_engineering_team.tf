@@ -14,5 +14,5 @@ module "platform_engineering_team" {
   #        display_id_and_name = true
   #    }
   #]
-  users = [data.octopusdeploy_users.octopus_config_service_account.users[0].id]
+  users = [data.octopusdeploy_users.octopus_config_service_account.users[0].id, data.octopusdeploy_users.ryan_rousseau.users[0].id]
 }
