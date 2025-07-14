@@ -218,7 +218,7 @@ step "canary-phase-1-waiting-period" {
 
     action {
         action_type = "Octopus.Script"
-        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
             Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
