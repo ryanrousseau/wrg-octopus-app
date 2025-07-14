@@ -66,6 +66,7 @@ jobs:
               TF_VAR_azure_account_password: ${{ secrets.ARM_CLIENT_SECRET }}
               TF_VAR_azure_account_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
               TF_VAR_azure_account_tenant_id: ${{ secrets.ARM_TENANT_ID }}
+              TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
             run: terraform apply -auto-approve
     apply-terraform-s3-backend:
         if: vars.BACKEND == 's3'
@@ -110,4 +111,5 @@ jobs:
               TF_VAR_azure_account_password: ${{ secrets.ARM_CLIENT_SECRET }}
               TF_VAR_azure_account_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
               TF_VAR_azure_account_tenant_id: ${{ secrets.ARM_TENANT_ID }}
+              TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
             run: terraform apply -auto-approve

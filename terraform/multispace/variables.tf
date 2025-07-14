@@ -31,3 +31,8 @@ variable "octopus_service_account" {
   type    = string
   default = "Octopus Configuration Service Account"
 }
+
+variable "platform_hub_git_credential_password" {
+  type      = string
+  sensitive = true
+}

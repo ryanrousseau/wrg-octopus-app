@@ -178,3 +178,12 @@ module "test_project_scheduled_trigger" {
   deploy_latest_release_action_destination_environment_id = module.default_dev_test_prod.test_env_id
   deploy_latest_release_action_should_redeploy = true
 }
+
+module "platform_hub_git_credential" {
+    source = "../modules/git_credential"
+
+    name = "Platform Hub Credential"
+    username = "ryanrousseau"
+    password = var.platform_hub_git_credential_password
+    space_id = data.octopusdeploy_space.default.id
+}
