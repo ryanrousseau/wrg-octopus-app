@@ -215,6 +215,9 @@ step "add-canary-pods-to-service" {
 
 step "canary-phase-1-waiting-period" {
     name = "Canary phase 1 waiting period"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+    }
 
     action {
         action_type = "Octopus.Script"
@@ -272,11 +275,15 @@ step "deploy-canary-phase-2" {
 
 step "canary-phase-2-waiting-period" {
     name = "Canary phase 2 waiting period"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+    }
 
     action {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
+            Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
                 
@@ -332,11 +339,15 @@ step "deploy-canary-phase-3" {
 
 step "canary-phase-3-waiting-period" {
     name = "Canary phase 3 waiting period"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+    }
 
     action {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
+            Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
                 
