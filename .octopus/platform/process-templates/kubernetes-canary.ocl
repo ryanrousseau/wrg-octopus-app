@@ -22,6 +22,14 @@ parameter "Template.Kubernetes.Canary.Tag" {
     label = "Cluster tag"
 }
 
+parameter "Template.Kubernetes.Container" {
+    display_settings = {
+        Octopus.ControlType = "Package"
+    }
+    help_text = "The container to deploy"
+    label = "App Container"
+}
+
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
     properties = {
@@ -164,14 +172,14 @@ step "deploy-products-deployment" {
         }
         worker_pool_variable = ""
 
-        packages "octopub-frontend" {
+        packages "app-container" {
             acquisition_location = "NotAcquired"
             feed = "docker-hub"
-            package_id = "octopussamples/octopub-frontend"
             properties = {
                 Extract = "False"
+                PackageParameterName = "Template.Kubernetes.Container"
                 Purpose = ""
-                SelectionMode = "immediate"
+                SelectionMode = "deferred"
             }
         }
     }
@@ -417,14 +425,13 @@ step "update-main-products-app-service" {
         }
         worker_pool_variable = ""
 
-        packages "octopub-frontend" {
+        packages "app-container" {
             acquisition_location = "NotAcquired"
-            feed = "docker-hub"
-            package_id = "octopussamples/octopub-frontend"
             properties = {
-                Extract = "False"
-                Purpose = ""
-                SelectionMode = "immediate"
+                Extract = "false"
+                PackageParameterName = "Template.Kubernetes.Container"
+                Purpose = "DockerImageReference"
+                SelectionMode = "deferred"
             }
         }
     }
