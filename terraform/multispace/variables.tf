@@ -27,6 +27,11 @@ variable "azure_account_tenant_id" {
   sensitive = true
 }
 
+variable "azure_feed_pat" {
+  type      = string
+  sensitive = true
+}
+
 variable "octopus_service_account" {
   type    = string
   default = "Octopus Configuration Service Account"

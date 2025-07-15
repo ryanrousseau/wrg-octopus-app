@@ -86,15 +86,25 @@ resource "octopusdeploy_scoped_user_role" "new_cascadia_imports_space_qa_team_de
 }
 
 module "new_cascadia_imports_space_docker_registry" {
-  source = "../modules/feeds/docker_container_registry"
+  source   = "../modules/feeds/docker_container_registry"
 
   name     = "Docker Hub"
   space_id = module.new_cascadia_imports_space.id
 }
 
 module "new_cascadia_imports_space_helm_feed" {
-  source = "../modules/feeds/helm_feed"
+  source   = "../modules/feeds/helm_feed"
 
   name     = "Helm - Stable"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_azure_feed" {
+  source   = "../modules/feeds/nuget_feed"
+
+  feed_uri = "https://pkgs.dev.azure.com/octopussamples/_packaging/octopus-demo-artifacts/nuget/v3/index.json"
+  name     = "Azure Artifacts"
+  username = "azure"
+  password = var.azure_feed_pat
   space_id = module.new_cascadia_imports_space.id
 }
