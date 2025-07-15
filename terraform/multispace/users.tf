@@ -7,3 +7,8 @@ data "octopusdeploy_users" "ryan_rousseau" {
   filter = "Ryan Rousseau"
   take   = 1
 }
+
+data "octopusdeploy_users" "mark_harrison" {
+  filter = "Mark Harrison"
+  take   = 1
+}
