@@ -39,30 +39,18 @@ step "create-namespace-if-it-does-not-exist" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                # Set varaibles
-                $clusterNamespace = $OctopusParameters["Octopub.Yaml.Cluster.Namespace"]
-                
-                # Get existing namespaces
-                Write-Host "Retrieving namespaces ..."
-                $namespaces = (kubectl get namespaces -o JSON | ConvertFrom-Json)
-                
-                # Check to see if namespace exists
-                if ($null -eq ($namespaces.Items | Where-Object {$_.metadata.name -eq $clusterNamespace}))
-                {
-                	# Create the namespace
-                    Write-Host "Namespace $clusetrNamespace doesn't exist, creating ..."
-                    kubectl create namespace $clusterNamespace
-                }
-                else
-                {
-                	Write-Host "Namespace $clusterNamespace already exists, moving on ..."
-                }
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/create-namespace.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -175,6 +163,7 @@ step "deploy-products-deployment" {
         packages "app-container" {
             acquisition_location = "NotAcquired"
             feed = "docker-hub"
+            package_id = ""
             properties = {
                 Extract = "False"
                 PackageParameterName = "Template.Kubernetes.Container"
@@ -427,6 +416,8 @@ step "update-main-products-app-service" {
 
         packages "app-container" {
             acquisition_location = "NotAcquired"
+            feed = "octopus-server-built-in"
+            package_id = ""
             properties = {
                 Extract = "false"
                 PackageParameterName = "Template.Kubernetes.Container"
