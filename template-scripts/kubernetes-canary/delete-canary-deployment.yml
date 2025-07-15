@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: #{Project.Deployment.Name}-canary
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      component: #{Project.Labels.Component}
+      type: canary
+  template:
+    metadata:
+      labels:
+        component: #{Project.Labels.Component}
+        type: canary
+    spec:
+      containers:
+        - name: #{Project.Labels.Component}
+          image: #{Project.Container.Name}:#{Project.Container.Tag}
+          ports:
+            - containerPort: #{Project.Service.Port}
+              name: #{Project.Service.PortName}

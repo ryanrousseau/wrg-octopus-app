@@ -54,7 +54,7 @@ step "create-namespace-if-it-does-not-exist" {
     }
 }
 
-step "create-products-app-service" {
+step "create-service" {
     name = "Create service"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
@@ -68,24 +68,7 @@ step "create-products-app-service" {
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: v1
-                kind: Service
-                metadata:
-                  name: octopub-frontend-cluster-ip
-                  labels:
-                    component: #{Project.Labels.Component}
-                    type: main
-                spec:
-                  type: ClusterIP
-                  selector:
-                    component: #{Project.Labels.Component}
-                  ports:
-                    - port: 8080
-                      targetPort: 8080
-                      name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/create-service.yml"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -110,23 +93,22 @@ step "scale-up-existing-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $ErrorActionPreference = "Continue"
-                
-                $deployment = $OctopusParameters["Project.Deployment.Name"]
-                
-                kubectl scale --current-replicas=1 --replicas=3 deployment/$deployment
-                
-                $LastExitCode = 0
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/scale-existing-deployment.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
-step "deploy-products-deployment" {
+step "deploy-canary-phase-1" {
     name = "Deploy canary phase 1"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
@@ -135,40 +117,23 @@ step "deploy-products-deployment" {
     action "deploy-canary-phase-1" {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
-            Octopus.Action.Kubernetes.DeploymentTimeout = "360"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: #{Project.Deployment.Name}-canary
-                spec:
-                  replicas: 1
-                  selector:
-                    matchLabels:
-                      component: #{Project.Labels.Component}
-                      type: canary
-                  template:
-                    metadata:
-                      labels:
-                        component: #{Project.Labels.Component}
-                        type: canary
-                    spec:
-                      containers:
-                        - name: web
-                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
-                          ports:
-                            - containerPort: 8080
-                              name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "*.yaml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Package.JsonConfigurationVariablesTargets = "**/*.{yml,yaml}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/canary-phase-1.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
 
         packages "app-container" {
             acquisition_location = "NotAcquired"
@@ -193,30 +158,23 @@ step "add-canary-pods-to-service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: v1
-                kind: Service
-                metadata:
-                  name: octopub-frontend-cluster-ip
-                  labels:
-                    component: #{Project.Labels.Component}
-                spec:
-                  type: ClusterIP
-                  selector:
-                    component: #{Project.Labels.Component}
-                  ports:
-                    - port: 8080
-                      targetPort: 8080
-                      name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/add-canary-pods-to-service.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -230,17 +188,18 @@ step "canary-phase-1-waiting-period" {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
-            Octopus.Action.RunOnServer = "false"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
-                
-                Start-Sleep -Seconds $seconds
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -267,16 +226,19 @@ step "deploy-canary-phase-2" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $deployment = $OctopusParameters["Project.Deployment.Name"] + "-canary"
-                
-                kubectl scale --current-replicas=1 --replicas=3 deployment/$deployment
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/canary-phase-2.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -290,17 +252,18 @@ step "canary-phase-2-waiting-period" {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
-            Octopus.Action.RunOnServer = "false"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
-                
-                Start-Sleep -Seconds $seconds
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -327,20 +290,19 @@ step "deploy-canary-phase-3" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $ErrorActionPreference = "Continue"
-                
-                $deployment = $OctopusParameters["Project.Deployment.Name"]
-                
-                kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
-                
-                $LastExitCode = 0
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/canary-phase-3.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -354,17 +316,18 @@ step "canary-phase-3-waiting-period" {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
         properties = {
-            Octopus.Action.RunOnServer = "false"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $seconds = $OctopusParameters["Project.Canary.WaitPeriod"]
-                
-                Start-Sleep -Seconds $seconds
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -382,8 +345,8 @@ step "approve-canary-phase-3" {
     }
 }
 
-step "update-main-products-app-service" {
-    name = "Update main products app service"
+step "update-main" {
+    name = "Update main deployment"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
     }
@@ -391,38 +354,23 @@ step "update-main-products-app-service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: #{Project.Deployment.Name}
-                spec:
-                  replicas: 1
-                  selector:
-                    matchLabels:
-                      component: #{Project.Labels.Component}
-                      type: main
-                  template:
-                    metadata:
-                      labels:
-                        component: #{Project.Labels.Component}
-                        type: main
-                    spec:
-                      containers:
-                        - name: web
-                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
-                          ports:
-                            - containerPort: 8080
-                              name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-main.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
 
         packages "app-container" {
             acquisition_location = "NotAcquired"
@@ -438,7 +386,7 @@ step "update-main-products-app-service" {
     }
 }
 
-step "remove-canary-pods-from-service" {
+step "remove-canary" {
     name = "Remove canary pods from service"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
@@ -447,31 +395,23 @@ step "remove-canary-pods-from-service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: v1
-                kind: Service
-                metadata:
-                  name: octopub-frontend-cluster-ip
-                  labels:
-                    component: #{Project.Labels.Component}
-                spec:
-                  type: ClusterIP
-                  selector:
-                    component: #{Project.Labels.Component}
-                    type: main
-                  ports:
-                    - port: 8080
-                      targetPort: 8080
-                      name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -484,38 +424,23 @@ step "delete-canary-deployment" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: #{Project.Deployment.Name}-canary
-                spec:
-                  replicas: 0
-                  selector:
-                    matchLabels:
-                      component: #{Project.Labels.Component}
-                      type: canary
-                  template:
-                    metadata:
-                      labels:
-                        component: #{Project.Labels.Component}
-                        type: canary
-                    spec:
-                      containers:
-                        - name: web
-                          image: octopussamples/octopub-frontend:#{Project.Container.Tag}
-                          ports:
-                            - containerPort: 8080
-                              name: http-port
-                EOT
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/delete-canary-deployment.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -528,27 +453,18 @@ step "detect-cancelled-canary" {
     action "detect-cancelled-canary-rollout" {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.RunOnServer = "false"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $ErrorActionPreference = "Continue"
-                
-                if ("#{Octopus.Action[Approve canary phase 1].Output.Manual.Approved}" -ieq "false" -or
-                	"#{Octopus.Action[Approve canary phase 2].Output.Manual.Approved}" -ieq "false" -or
-                	"#{Octopus.Action[Approve canary phase 3].Output.Manual.Approved}" -ieq "false") {
-                	Set-OctopusVariable -name "Cancelled" -value "True"
-                    Write-Highlight "Deployment was cancelled by a manual intervention."
-                } else {
-                	Set-OctopusVariable -name "Cancelled" -value "False"
-                    Write-Highlight "Deployment completed successfully, so no rollback required."
-                }
-                
-                $LastExitCode = 0
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/detected-cancelled-canary.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
@@ -563,25 +479,18 @@ step "rollback-canary-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $ErrorActionPreference = "Continue"
-                
-                if ("#{Octopus.Action[Detect cancelled canary rollout].Output.Cancelled}" -ieq "true") {
-                
-                	$deployment = $OctopusParameters["Project.Deployment.Name"]
-                	$canary = $deployment + "-canary"
-                
-                	kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
-                
-                    kubectl delete deployment $canary
-                }
-                
-                $LastExitCode = 0
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/rollback-canary.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }

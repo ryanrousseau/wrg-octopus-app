@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: #{Project.Deployment.Name}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: #{Project.Labels.Component}
+      type: main
+  template:
+    metadata:
+      labels:
+        component: #{Project.Labels.Component}
+        type: main
+    spec:
+      containers:
+        - name: #{Project.Labels.Component}
+          image: #{Project.Container.Name}:#{Project.Container.Tag}
+          ports:
+            - containerPort: #{Project.Service.Port}
+              name: #{Project.Service.PortName}
