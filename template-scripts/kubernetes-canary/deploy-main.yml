@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: #{Project.Labels.Component}
-          image: #{Project.Container.Name}:#{Project.Container.Tag}
+          image: #{Project.Container.Image}
           ports:
             - containerPort: #{Project.Service.Port}
               name: #{Project.Service.PortName}
