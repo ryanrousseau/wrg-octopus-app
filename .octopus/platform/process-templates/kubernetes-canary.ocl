@@ -55,14 +55,15 @@ step "create-namespace-if-it-does-not-exist" {
 }
 
 step "create-products-app-service" {
-    name = "Create frontend app service"
+    name = "Create service"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "create-frontend-app-service" {
+    action "create-service" {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
@@ -84,10 +85,19 @@ step "create-products-app-service" {
                       targetPort: 8080
                       name: http-port
                 EOT
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopub.Yaml.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/create-service.yml"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/create-service.yml"]
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
     }
 }
 
