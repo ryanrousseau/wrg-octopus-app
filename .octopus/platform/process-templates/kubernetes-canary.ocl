@@ -76,7 +76,7 @@ step "create-service" {
 
         git_dependencies {
             default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-canary/create-service.yml"]
+            file_path_filters = ["template-scripts/kubernetes-canary/deploy-service.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -130,6 +130,7 @@ step "deploy-canary-phase-1" {
 
         git_dependencies {
             default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/canary-phase-1.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -171,6 +172,7 @@ step "add-canary-pods-to-service" {
 
         git_dependencies {
             default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/add-canary-pods-to-service.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -367,6 +369,7 @@ step "update-main" {
 
         git_dependencies {
             default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/deploy-main.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -408,6 +411,7 @@ step "remove-canary" {
 
         git_dependencies {
             default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/deploy-service.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -437,9 +441,22 @@ step "delete-canary-deployment" {
 
         git_dependencies {
             default_branch = "main"
+            file_path_filters = ["template-scripts/kubernetes-canary/delete-canary-deployment.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
+
+        packages "app-container" {
+            acquisition_location = "NotAcquired"
+            feed = "docker-hub"
+            package_id = ""
+            properties = {
+                Extract = "False"
+                PackageParameterName = "Template.Kubernetes.Container"
+                Purpose = ""
+                SelectionMode = "deferred"
+            }
         }
     }
 }
@@ -454,7 +471,7 @@ step "detect-cancelled-canary" {
         action_type = "Octopus.Script"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
-            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/detected-cancelled-canary.ps1"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/detect-cancelled-canary.ps1"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
