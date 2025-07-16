@@ -67,6 +67,7 @@ jobs:
               TF_VAR_azure_account_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
               TF_VAR_azure_account_tenant_id: ${{ secrets.ARM_TENANT_ID }}
               TF_VAR_azure_feed_pat: ${{ secrets.AZURE_FEED_PAT }}
+              TF_VAR_docker_hub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}
               TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
             run: terraform apply -auto-approve
     apply-terraform-s3-backend:
@@ -113,5 +114,6 @@ jobs:
               TF_VAR_azure_account_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
               TF_VAR_azure_account_tenant_id: ${{ secrets.ARM_TENANT_ID }}
               TF_VAR_azure_feed_pat: ${{ secrets.AZURE_FEED_PAT }}
+              TF_VAR_docker_hub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}
               TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
             run: terraform apply -auto-approve

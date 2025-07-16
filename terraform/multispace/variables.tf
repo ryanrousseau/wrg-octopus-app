@@ -32,6 +32,11 @@ variable "azure_feed_pat" {
   sensitive = true
 }
 
+variable "docker_hub_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "octopus_service_account" {
   type    = string
   default = "Octopus Configuration Service Account"

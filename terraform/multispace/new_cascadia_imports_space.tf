@@ -90,6 +90,8 @@ module "new_cascadia_imports_space_docker_registry" {
 
   name     = "Docker Hub"
   space_id = module.new_cascadia_imports_space.id
+  username = "octopussolutionsengineering"
+  password = var.docker_hub_password
 }
 
 module "new_cascadia_imports_space_helm_feed" {
