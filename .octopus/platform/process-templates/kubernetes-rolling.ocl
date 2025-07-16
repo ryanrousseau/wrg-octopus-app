@@ -3,18 +3,22 @@ description = ""
 
 parameter "Template.Deployment.Name" {
     display_settings = {
-        Octopus.ControlType = "SingeLineTextbox"
+        Octopus.ControlType = "SingleLineText"
     }
     help_text = ""
     label = "Deployment name"
+
+    value "" {}
 }
 
 parameter "Template.Deployment.Replicas" {
     display_settings = {
-        Octopus.ControlType = "SingeLineTextbox"
+        Octopus.ControlType = "SingleLineText"
     }
     help_text = ""
     label = "Replicas"
+
+    value "3" {}
 }
 
 parameter "Template.Environment.Production" {
@@ -71,7 +75,7 @@ step "apply-deployment" {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "apply-deployment" {
+    action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
@@ -113,7 +117,7 @@ step "apply-service" {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "apply-service" {
+    action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
