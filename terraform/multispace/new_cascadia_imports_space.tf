@@ -108,3 +108,38 @@ module "new_cascadia_imports_space_azure_feed" {
   password = var.azure_feed_pat
   space_id = module.new_cascadia_imports_space.id
 }
+
+module "new_cascadia_imports_space_templates_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Templates"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_kubernetes_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Kubernetes"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_lambda_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Lambda"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_machines_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Machines"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_octopub_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Octopub"
+  space_id = module.new_cascadia_imports_space.id
+}
