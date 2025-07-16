@@ -1,11 +1,21 @@
 name = "Kubernetes - Rolling"
 description = ""
 
+parameter "Template.Cluster.Namespace" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The namespace to deploy the application into"
+    label = "Cluster namespace"
+
+    value "" {}
+}
+
 parameter "Template.Deployment.Name" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
     }
-    help_text = ""
+    help_text = "The name of the deployment to create/update"
     label = "Deployment name"
 
     value "" {}
@@ -27,6 +37,56 @@ parameter "Template.Environment.Production" {
     }
     help_text = ""
     label = "Production environment"
+}
+
+parameter "Template.Labels.Component" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The component label to add to the deployment and service definitions."
+    label = "Component label"
+
+    value "app" {}
+}
+
+parameter "Template.Service.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The name of the service to create/update."
+    label = "Service name"
+
+    value "" {}
+}
+
+parameter "Template.Service.Port" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The port of the service to create/update."
+    label = "Service port"
+
+    value "8080" {}
+}
+
+parameter "Template.Service.PortName" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The name of port to create/update."
+    label = "Service port name"
+
+    value "http-port" {}
+}
+
+parameter "Template.Service.TargetPort" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The target port of the service to create/update."
+    label = "Service target port"
+
+    value "8080" {}
 }
 
 parameter "Template.Tag" {
@@ -83,7 +143,7 @@ step "apply-deployment" {
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/apply-deployment.yml"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/deployment.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -91,7 +151,7 @@ step "apply-deployment" {
 
         git_dependencies {
             default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-rolling/apply-deployment.yml"]
+            file_path_filters = ["template-scripts/kubernetes-rolling/deployment.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
@@ -125,7 +185,7 @@ step "apply-service" {
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/apply-service.yml"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/service.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -133,7 +193,7 @@ step "apply-service" {
 
         git_dependencies {
             default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-rolling/apply-service.yml"]
+            file_path_filters = ["template-scripts/kubernetes-rolling/service.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
