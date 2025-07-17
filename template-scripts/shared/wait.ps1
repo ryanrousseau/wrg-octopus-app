@@ -1,3 +1,3 @@
-$seconds = $OctopusParameters["Project.Wait.Seconds"]
+$seconds = $OctopusParameters["Template.Wait.Seconds"]
 
 Start-Sleep -Seconds $seconds

@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Continue"
 
-$deployment = $OctopusParameters["Project.Deployment.Name"]
+$deployment = $OctopusParameters["Template.Deployment.Name"]
 
 kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
 

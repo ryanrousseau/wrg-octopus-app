@@ -1,8 +1,8 @@
-name = "Kubernetes - Canary"
+name = "Kubernetes - Blue-Green"
 description = ""
 
 icon {
-    color = "#FFB867"
+    color = "#0D80D8"
     id = "crow"
 }
 
@@ -92,16 +92,6 @@ parameter "Template.Service.TargetPort" {
     label = "Service target port"
 
     value "8080" {}
-}
-
-parameter "Template.Wait.Seconds" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = "The amount of time to wait after a canary phase."
-    label = "Waiting period (seconds)"
-
-    value "60" {}
 }
 
 parameter "Template.Tag" {

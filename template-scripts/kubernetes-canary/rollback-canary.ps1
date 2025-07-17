@@ -2,7 +2,7 @@ $ErrorActionPreference = "Continue"
 
 if ("#{Octopus.Action[Detect cancelled canary rollout].Output.Cancelled}" -ieq "true") {
 
-	$deployment = $OctopusParameters["Project.Deployment.Name"]
+	$deployment = $OctopusParameters["Template.Deployment.Name"]
 	$canary = $deployment + "-canary"
 
 	kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment

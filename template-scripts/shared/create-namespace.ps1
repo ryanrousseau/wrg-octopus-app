@@ -1,5 +1,5 @@
 # Set varaibles
-$clusterNamespace = $OctopusParameters["Project.Cluster.Namespace"]
+$clusterNamespace = $OctopusParameters["Template.Cluster.Namespace"]
 
 # Get existing namespaces
 Write-Host "Retrieving namespaces ..."
