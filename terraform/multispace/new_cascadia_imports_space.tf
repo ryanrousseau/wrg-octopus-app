@@ -145,3 +145,10 @@ module "new_cascadia_imports_space_octopub_project_group" {
   name     = "Octopub"
   space_id = module.new_cascadia_imports_space.id
 }
+
+module "new_cascadia_imports_space_temp_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "Temp"
+  space_id = module.new_cascadia_imports_space.id
+}
