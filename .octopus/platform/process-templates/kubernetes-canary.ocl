@@ -6,7 +6,37 @@ icon {
     id = "crow"
 }
 
-parameter "Template.Kubernetes.Canary.Production" {
+parameter "Template.Cluster.Namespace" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The namespace to deploy the application into"
+    label = "Cluster namespace"
+
+    value "" {}
+}
+
+parameter "Template.Deployment.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The name of the deployment to create/update"
+    label = "Deployment name"
+
+    value "" {}
+}
+
+parameter "Template.Deployment.Replicas" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Replicas"
+
+    value "3" {}
+}
+
+parameter "Template.Environment.Production" {
     display_settings = {
         Octopus.ControlType = "Environments"
     }
@@ -14,7 +44,57 @@ parameter "Template.Kubernetes.Canary.Production" {
     label = "Production environment"
 }
 
-parameter "Template.Kubernetes.Canary.Tag" {
+parameter "Template.Labels.Component" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The component label to add to the deployment and service definitions."
+    label = "Component label"
+
+    value "app" {}
+}
+
+parameter "Template.Service.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The name of the service to create/update."
+    label = "Service name"
+
+    value "" {}
+}
+
+parameter "Template.Service.Port" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The port of the service to create/update."
+    label = "Service port"
+
+    value "8080" {}
+}
+
+parameter "Template.Service.PortName" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The name of port to create/update."
+    label = "Service port name"
+
+    value "http-port" {}
+}
+
+parameter "Template.Service.TargetPort" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The target port of the service to create/update."
+    label = "Service target port"
+
+    value "8080" {}
+}
+
+parameter "Template.Tag" {
     display_settings = {
         Octopus.ControlType = "TargetTags"
     }
@@ -22,7 +102,7 @@ parameter "Template.Kubernetes.Canary.Tag" {
     label = "Cluster tag"
 }
 
-parameter "Template.Kubernetes.Container" {
+parameter "Template.Container" {
     display_settings = {
         Octopus.ControlType = "Package"
     }
@@ -69,7 +149,7 @@ step "create-service" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -123,7 +203,7 @@ step "deploy-canary-phase-1" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/canary-phase-1.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -142,7 +222,7 @@ step "deploy-canary-phase-1" {
             package_id = ""
             properties = {
                 Extract = "False"
-                PackageParameterName = "Template.Kubernetes.Container"
+                PackageParameterName = "Template.Container"
                 Purpose = ""
                 SelectionMode = "deferred"
             }
@@ -165,7 +245,7 @@ step "add-canary-pods-to-service" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/add-canary-pods-to-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -188,7 +268,7 @@ step "canary-phase-1-waiting-period" {
 
     action {
         action_type = "Octopus.Script"
-        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        excluded_environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
@@ -210,7 +290,7 @@ step "approve-canary-phase-1" {
 
     action {
         action_type = "Octopus.Manual"
-        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 1"
@@ -228,7 +308,7 @@ step "deploy-canary-phase-2" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/canary-phase-2.ps1"
             Octopus.Action.Script.ScriptSource = "GitRepository"
@@ -247,12 +327,12 @@ step "deploy-canary-phase-2" {
 step "canary-phase-2-waiting-period" {
     name = "Canary phase 2 waiting period"
     properties = {
-        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
         action_type = "Octopus.Script"
-        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        excluded_environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
@@ -274,7 +354,7 @@ step "approve-canary-phase-2" {
 
     action {
         action_type = "Octopus.Manual"
-        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 2"
@@ -292,7 +372,7 @@ step "deploy-canary-phase-3" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/canary-phase-3.ps1"
             Octopus.Action.Script.ScriptSource = "GitRepository"
@@ -311,12 +391,12 @@ step "deploy-canary-phase-3" {
 step "canary-phase-3-waiting-period" {
     name = "Canary phase 3 waiting period"
     properties = {
-        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
         action_type = "Octopus.Script"
-        excluded_environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        excluded_environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
@@ -338,7 +418,7 @@ step "approve-canary-phase-3" {
 
     action {
         action_type = "Octopus.Manual"
-        environments_variable = "#{Template.Kubernetes.Canary.Production}"
+        environments_variable = "#{Template.Environment.Production}"
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 2"
@@ -362,7 +442,7 @@ step "update-main" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-main.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -381,7 +461,7 @@ step "update-main" {
             package_id = ""
             properties = {
                 Extract = "false"
-                PackageParameterName = "Template.Kubernetes.Container"
+                PackageParameterName = "Template.Container"
                 Purpose = "DockerImageReference"
                 SelectionMode = "deferred"
             }
@@ -404,7 +484,7 @@ step "remove-canary" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -434,7 +514,7 @@ step "delete-canary-deployment" {
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/delete-canary-deployment.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool_variable = ""
@@ -453,7 +533,7 @@ step "delete-canary-deployment" {
             package_id = ""
             properties = {
                 Extract = "False"
-                PackageParameterName = "Template.Kubernetes.Container"
+                PackageParameterName = "Template.Container"
                 Purpose = ""
                 SelectionMode = "deferred"
             }
@@ -464,7 +544,7 @@ step "delete-canary-deployment" {
 step "detect-cancelled-canary" {
     name = "Detect cancelled canary rollout"
     properties = {
-        Octopus.Action.TargetRoles = "#{Template.Kubernetes.Canary.Tag}"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action "detect-cancelled-canary-rollout" {
@@ -496,7 +576,7 @@ step "rollback-canary-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-canary/rollback-canary.ps1"
             Octopus.Action.Script.ScriptSource = "GitRepository"

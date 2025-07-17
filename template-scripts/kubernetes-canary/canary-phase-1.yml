@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: #{Project.Deployment.Name}-canary
+  name: #{Template.Deployment.Name}-canary
 spec:
-  replicas: 1
+  replicas: #{Template.Deployment.Replicas}
   selector:
     matchLabels:
-      component: #{Project.Labels.Component}
+      component: #{Template.Labels.Component}
       type: canary
   template:
     metadata:
       labels:
-        component: #{Project.Labels.Component}
+        component: #{Template.Labels.Component}
         type: canary
     spec:
       containers:
-        - name: #{Project.Labels.Component}
-          image: #{Project.Container.Image}
+        - name: #{Template.Labels.Component}
+          image: #{Octopus.Action.Package[app-container].Image}
           ports:
-            - containerPort: #{Project.Service.Port}
-              name: #{Project.Service.PortName}
+            - containerPort: #{Template.Service.Port}
+              name: #{Template.Service.PortName}
