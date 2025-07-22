@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: #{Template.Deployment.Name}-#{Octopus.Deployment.Id | ToLower}
+spec:
+  replicas: #{Template.Deployment.PreviewReplicas}
+  selector:
+    matchLabels:
+      component: #{Template.Labels.Component}
+      deployment: #{Octopus.Deployment.Id}
+  template:
+    metadata:
+      labels:
+        component: #{Template.Labels.Component}
+        deployment: #{Octopus.Deployment.Id}
+    spec:
+      containers:
+        - name: #{Template.Labels.Component}
+          image: #{Octopus.Action.Package[app-container].Image}
+          ports:
+            - containerPort: #{Template.Container.Port}
+              name: #{Template.Container.PortName}

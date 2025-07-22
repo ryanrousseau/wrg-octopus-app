@@ -26,6 +26,16 @@ parameter "Template.Deployment.Name" {
     value "" {}
 }
 
+parameter "Template.Deployment.PreviewReplicas" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "PreviewReplicas"
+
+    value "1" {}
+}
+
 parameter "Template.Deployment.Replicas" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
@@ -64,6 +74,16 @@ parameter "Template.Service.Name" {
     value "" {}
 }
 
+parameter "Template.Service.PreviewPort" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The port of the service to create/update."
+    label = "Preview service port"
+
+    value "8090" {}
+}
+
 parameter "Template.Service.Port" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
@@ -74,7 +94,7 @@ parameter "Template.Service.Port" {
     value "8080" {}
 }
 
-parameter "Template.Service.PortName" {
+parameter "Template.Container.PortName" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
     }
@@ -84,7 +104,7 @@ parameter "Template.Service.PortName" {
     value "http-port" {}
 }
 
-parameter "Template.Service.TargetPort" {
+parameter "Template.Container.TargetPort" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
     }
@@ -133,6 +153,31 @@ step "create-namespace-if-it-does-not-exist" {
         }
     }
 }
+
+step "get-active-deployment" {
+    name = "Get active deployment"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-blue-green/get-active-deployment.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
+        }
+        worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
+    }
+}
+
 
 step "create-service" {
     name = "Create service"

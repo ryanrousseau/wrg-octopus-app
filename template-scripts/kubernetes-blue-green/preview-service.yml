@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: #{Template.Service.Name}-preview
+  labels:
+    component: #{Template.Labels.Component}
+spec:
+  type: ClusterIP
+  selector:
+    component: #{Template.Labels.Component} 
+    deployment: #{Octopus.Deployment.Id}
+  ports:
+    - port: #{Template.Service.PreviewPort}
+      targetPort: #{Template.Container.PortName}
