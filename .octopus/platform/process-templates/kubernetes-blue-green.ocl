@@ -179,13 +179,13 @@ step "get-active-deployment" {
     }
 }
 
-step "create-preview-deployment" {
-    name = "Create preview deployment"
+step "create-deployment" {
+    name = "Create deployment"
     properties = {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "create-preview-deployment" {
+    action "create-deployment" {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
@@ -193,7 +193,7 @@ step "create-preview-deployment" {
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/preview-deployment.yml"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/deployment.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -201,10 +201,22 @@ step "create-preview-deployment" {
 
         git_dependencies {
             default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-blue-green/preview-deployment.yml"]
+            file_path_filters = ["template-scripts/kubernetes-blue-green/deployment.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
+
+        packages "app-container" {
+            acquisition_location = "NotAcquired"
+            feed = "docker-hub"
+            package_id = ""
+            properties = {
+                Extract = "False"
+                PackageParameterName = "Template.Container"
+                Purpose = ""
+                SelectionMode = "deferred"
+            }
         }
     }
 }
