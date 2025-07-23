@@ -130,6 +130,16 @@ parameter "Template.Container" {
     label = "App Container"
 }
 
+parameter "Template.Wait.Seconds" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = "The amount of time to wait after a canary phase."
+    label = "Waiting period (seconds)"
+
+    value "60" {}
+}
+
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
     properties = {
