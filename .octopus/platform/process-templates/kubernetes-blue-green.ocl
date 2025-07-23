@@ -193,7 +193,7 @@ step "create-service" {
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
-            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/service.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -201,7 +201,7 @@ step "create-service" {
 
         git_dependencies {
             default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-canary/deploy-service.yml"]
+            file_path_filters = ["template-scripts/kubernetes-blue-green/service.yml"]
             git_credential_id = "GitCredentials-2"
             git_credential_type = "Library"
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
