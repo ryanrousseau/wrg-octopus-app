@@ -18,5 +18,5 @@ spec:
         - name: #{Template.Labels.Component}
           image: #{Octopus.Action.Package[app-container].Image}
           ports:
-            - containerPort: #{Template.Container.Port}
+            - containerPort: #{Template.Container.TargetPort}
               name: #{Template.Container.PortName}
