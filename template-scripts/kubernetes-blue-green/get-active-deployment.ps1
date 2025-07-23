@@ -1,6 +1,6 @@
 $serviceName = $OctopusParameters["Template.Service.Name"]
 
-$deploymentId = $(kubectl get service $serviceName-o json | jq -r '.spec.selector.deployment')
+$deploymentId = $(kubectl get service $serviceName -o json | jq -r '.spec.selector.deployment')
 
 Write-Verbose "Found previous deployment: $deploymentId"
 
