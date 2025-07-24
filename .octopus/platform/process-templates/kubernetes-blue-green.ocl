@@ -329,3 +329,28 @@ step "create-service" {
         }
     }
 }
+
+step "scale-down-previous-deployment" {
+    name = "Scale down previous deployment"
+    properties = {
+        Octopus.Action.TargetRoles = "octopub"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-blue-green/scale-down-previous-deployment.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
+        }
+        worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-2"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
+        }
+    }
+}
