@@ -1,3 +1,4 @@
+$deploymentName = $OctopusParameters["Template.Deployment.Name"]
 $serviceName = $OctopusParameters["Template.Service.Name"]
 
 $deploymentId = $(kubectl get service $serviceName -o json | jq -r '.spec.selector.deployment')
@@ -5,8 +6,9 @@ $deploymentId = $(kubectl get service $serviceName -o json | jq -r '.spec.select
 $foundActiveDeployment = -not ($deploymentId -eq $null)
 
 if ($foundActiveDeployment) {
-    Write-Verbose "Found previous deployment: $deploymentId"
-    Set-OctopusVariable -name "PreviousDeployment" -value $deploymentId
+    $deployment = $deploymentName + "-" + $deploymentId.ToLower()
+    Write-Verbose "Found previous deployment: $deployment"
+    Set-OctopusVariable -name "PreviousDeployment" -value $deployment
 } else {
     Write-Warning "Did not find an existing deployment"
 }

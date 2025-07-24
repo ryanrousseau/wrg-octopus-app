@@ -348,7 +348,7 @@ step "scale-down-previous-deployment" {
                 
                 Write-Highlight "Scaling down $previousDeployment"
                 
-                kubectl scale --replicas 0 deployment/$deploymentName-$previousDeployment
+                kubectl scale --replicas 0 deployment/$previousDeployment
                 
                 $LastExitCode = 0
                 
