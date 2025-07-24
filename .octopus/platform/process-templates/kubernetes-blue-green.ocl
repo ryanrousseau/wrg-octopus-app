@@ -343,11 +343,12 @@ step "scale-down-previous-deployment" {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
+                $deploymentName = $OctopusParameters["Template.Deployment.Name"]
                 $previousDeployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Get active deployment].Output.PreviousDeployment"]
                 
                 Write-Highlight "Scaling down $previousDeployment"
                 
-                kubectl scale --replicas 0 deployment/$previousDeployment
+                kubectl scale --replicas 0 deployment/$deploymentName-$previousDeployment
                 
                 $LastExitCode = 0
                 
