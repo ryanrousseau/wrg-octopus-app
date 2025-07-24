@@ -149,18 +149,31 @@ step "create-namespace-if-it-does-not-exist" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
-            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/create-namespace.ps1"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                # Set varaibles
+                $clusterNamespace = $OctopusParameters["Template.Cluster.Namespace"]
+                
+                # Get existing namespaces
+                Write-Host "Retrieving namespaces ..."
+                $namespaces = (kubectl get namespaces -o JSON | ConvertFrom-Json)
+                
+                # Check to see if namespace exists
+                if ($null -eq ($namespaces.Items | Where-Object {$_.metadata.name -eq $clusterNamespace}))
+                {
+                	# Create the namespace
+                    Write-Host "Namespace $clusetrNamespace doesn't exist, creating ..."
+                    kubectl create namespace $clusterNamespace
+                }
+                else
+                {
+                	Write-Host "Namespace $clusterNamespace already exists, moving on ..."
+                }
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
 
@@ -173,19 +186,30 @@ step "get-active-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-blue-green/get-active-deployment.ps1"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $deploymentName = $OctopusParameters["Template.Deployment.Name"]
+                $serviceName = $OctopusParameters["Template.Service.Name"]
+                
+                $deploymentId = $(kubectl get service $serviceName -o json | jq -r '.spec.selector.deployment')
+                
+                $foundActiveDeployment = -not ($deploymentId -eq $null)
+                
+                if ($foundActiveDeployment) {
+                    $deployment = $deploymentName + "-" + $deploymentId.ToLower()
+                    Write-Verbose "Found previous deployment: $deployment"
+                    Set-OctopusVariable -name "PreviousDeployment" -value $deployment
+                } else {
+                    Write-Warning "Did not find an existing deployment"
+                }
+                
+                Set-OctopusVariable -name "FoundActiveDeployment" -value $foundActiveDeployment
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
 
@@ -198,24 +222,40 @@ step "create-deployment" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: #{Template.Deployment.Name}-#{Octopus.Deployment.Id | ToLower}
+                spec:
+                  replicas: #{Template.Deployment.Replicas}
+                  selector:
+                    matchLabels:
+                      component: #{Template.Labels.Component}
+                      deployment: #{Octopus.Deployment.Id}
+                  template:
+                    metadata:
+                      labels:
+                        component: #{Template.Labels.Component}
+                        deployment: #{Octopus.Deployment.Id}
+                    spec:
+                      containers:
+                        - name: #{Template.Labels.Component}
+                          image: #{Octopus.Action.Package[app-container].Image}
+                          ports:
+                            - containerPort: #{Template.Container.TargetPort}
+                              name: #{Template.Container.PortName}
+                
+                EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/deployment.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-blue-green/deployment.yml"]
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
 
         packages "app-container" {
             acquisition_location = "NotAcquired"
@@ -240,24 +280,32 @@ step "create-preview-service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: #{Template.Service.Name}-preview
+                  labels:
+                    component: #{Template.Labels.Component}
+                spec:
+                  type: ClusterIP
+                  selector:
+                    component: #{Template.Labels.Component} 
+                    deployment: #{Octopus.Deployment.Id}
+                  ports:
+                    - port: #{Template.Service.PreviewPort}
+                      targetPort: #{Template.Container.PortName}
+                
+                EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/preview-service.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-blue-green/preview-service.yml"]
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
 
@@ -271,18 +319,17 @@ step "waiting-period" {
         action_type = "Octopus.Script"
         excluded_environments_variable = "#{Template.Environment.Production}"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
-            Octopus.Action.Script.ScriptFileName = "template-scripts/shared/wait.ps1"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $seconds = $OctopusParameters["Template.Wait.Seconds"]
+                
+                Start-Sleep -Seconds $seconds
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
 
@@ -309,24 +356,33 @@ step "create-service" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
-            Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
             Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: #{Template.Service.Name}
+                  labels:
+                    component: #{Template.Labels.Component}
+                spec:
+                  type: ClusterIP
+                  selector:
+                    component: #{Template.Labels.Component}
+                    deployment: #{Octopus.Deployment.Id}
+                  ports:
+                    - port: #{Template.Service.Port}
+                      targetPort: #{Template.Service.TargetPort}
+                      name: #{Template.Service.PortName}
+                
+                EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/service.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            file_path_filters = ["template-scripts/kubernetes-blue-green/service.yml"]
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
 
