@@ -173,8 +173,8 @@ step "get-active-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
             Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-blue-green/get-active-deployment.ps1"
             Octopus.Action.Script.ScriptSource = "GitRepository"
         }
@@ -195,7 +195,7 @@ step "create-deployment" {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "create-deployment" {
+    action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
@@ -237,7 +237,7 @@ step "create-preview-service" {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "create-preview-service" {
+    action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
@@ -306,7 +306,7 @@ step "create-service" {
         Octopus.Action.TargetRoles = "octopub"
     }
 
-    action "create-service" {
+    action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
@@ -340,17 +340,21 @@ step "scale-down-previous-deployment" {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
             Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
-            Octopus.Action.GitRepository.Source = "External"
-            Octopus.Action.Script.ScriptFileName = "template-scripts/kubernetes-blue-green/scale-down-previous-deployment.ps1"
-            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Continue"
+                
+                $previousDeployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Get active deployment].Output.PreviousDeployment"]
+                
+                Write-Highlight "Scaling down $previousDeployment"
+                
+                kubectl scale --replicas 0 deployment/$previousDeployment
+                
+                $LastExitCode = 0
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
         }
         worker_pool_variable = ""
-
-        git_dependencies {
-            default_branch = "main"
-            git_credential_id = "GitCredentials-2"
-            git_credential_type = "Library"
-            repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
-        }
     }
 }
