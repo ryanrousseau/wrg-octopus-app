@@ -42,15 +42,15 @@ resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
     automatic_deployment_targets = []
     is_optional_phase            = true
     is_priority_phase            = true
-    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.test_env.id]
-    name                         = module.new_cascadia_imports_space_dev_test_prod.test_env.name
+    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.test_env_id]
+    name                         = module.new_cascadia_imports_space_dev_test_prod.test_env_name
   }
 
   phase {
     automatic_deployment_targets = []
     is_priority_phase            = true
-    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.prod_env.id]
-    name                         = module.new_cascadia_imports_space_dev_test_prod.prod_env.name
+    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
+    name                         = module.new_cascadia_imports_space_dev_test_prod.prod_env_name
 
     release_retention_policy {
       quantity_to_keep    = 180
