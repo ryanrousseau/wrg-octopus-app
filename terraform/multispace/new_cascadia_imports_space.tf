@@ -66,6 +66,77 @@ resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
   }
 }
 
+resource "octopusdeploy_lifecycle" "development_lifecycle" {
+  description = "Development lifecycle"
+  name        = "Development"
+  space_id    = module.new_cascadia_imports_space.id
+
+  release_retention_policy {
+    quantity_to_keep    = 30
+    should_keep_forever = false
+    unit                = "Days"
+  }
+
+  tentacle_retention_policy {
+    quantity_to_keep    = 3
+    should_keep_forever = false
+    unit                = "Items"
+  }
+
+  phase {
+    automatic_deployment_targets = [module.new_cascadia_imports_space_dev_test_prod.dev_env_id]
+    optional_deployment_targets  = []
+    name                         = module.new_cascadia_imports_space_dev_test_prod.dev_env_name
+  }
+}
+
+resource "octopusdeploy_lifecycle" "test_lifecycle" {
+  description = "Test lifecycle"
+  name        = "Test"
+  space_id    = module.new_cascadia_imports_space.id
+
+  release_retention_policy {
+    quantity_to_keep    = 30
+    should_keep_forever = false
+    unit                = "Days"
+  }
+
+  tentacle_retention_policy {
+    quantity_to_keep    = 3
+    should_keep_forever = false
+    unit                = "Items"
+  }
+
+  phase {
+    automatic_deployment_targets = [module.new_cascadia_imports_space_dev_test_prod.test_env_id]
+    optional_deployment_targets  = []
+    name                         = module.new_cascadia_imports_space_dev_test_prod.test_env_name
+  }
+}
+
+resource "octopusdeploy_lifecycle" "production_lifecycle" {
+  description = "Production lifecycle"
+  name        = "Production"
+  space_id    = module.new_cascadia_imports_space.id
+
+  release_retention_policy {
+    quantity_to_keep    = 30
+    should_keep_forever = false
+    unit                = "Days"
+  }
+
+  tentacle_retention_policy {
+    quantity_to_keep    = 3
+    should_keep_forever = false
+    unit                = "Items"
+  }
+
+  phase {
+    automatic_deployment_targets = [module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
+    optional_deployment_targets  = []
+    name                         = module.new_cascadia_imports_space_dev_test_prod.prod_env_name
+  }
+}
 
 module "new_cascadia_imports_space_dev_team" {
   source = "../modules/team"
