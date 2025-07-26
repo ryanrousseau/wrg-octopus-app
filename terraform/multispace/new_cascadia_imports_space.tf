@@ -21,6 +21,50 @@ module "new_cascadia_imports_space_dev_test_prod" {
   space_id = module.new_cascadia_imports_space.id
 }
 
+resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
+  description = "Hotfix lifecycle"
+  name        = "Hotfix"
+  space_id    = module.new_cascadia_imports_space.id
+
+  release_retention_policy {
+    quantity_to_keep    = 30
+    should_keep_forever = false
+    unit                = "Days"
+  }
+
+  tentacle_retention_policy {
+    quantity_to_keep    = 3
+    should_keep_forever = false
+    unit                = "Items"
+  }
+
+  phase {
+    automatic_deployment_targets = []
+    is_optional_phase            = true
+    is_priority_phase            = true
+    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.test_env.id]
+    name                         = module.new_cascadia_imports_space_dev_test_prod.test_env.name
+  }
+
+  phase {
+    automatic_deployment_targets = []
+    is_priority_phase            = true
+    optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.prod_env.id]
+    name                         = module.new_cascadia_imports_space_dev_test_prod.prod_env.name
+
+    release_retention_policy {
+      quantity_to_keep    = 180
+      should_keep_forever = false
+      unit                = "Days"
+    }
+
+    tentacle_retention_policy {
+      quantity_to_keep    = 3
+      should_keep_forever = false
+      unit                = "Items"
+    }
+  }
+}
 
 
 module "new_cascadia_imports_space_dev_team" {
