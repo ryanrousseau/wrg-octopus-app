@@ -1,6 +1,11 @@
 name = "Kubernetes - Rolling"
 description = ""
 
+icon {
+    color = "#AED0EB"
+    id = "retweet"
+}
+
 parameter "Template.Cluster.Namespace" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
