@@ -59,7 +59,7 @@ step "attempt-login" {
 
         container {
             feed = "#{Template.Worker.ContainerFeed}"
-            image = "octopusdeploy/aws-workertools"
+            image = "octopuslabs/aws-workertools"
         }
     }
 }
