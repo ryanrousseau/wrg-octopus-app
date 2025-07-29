@@ -85,7 +85,7 @@ step "validate-setup" {
                   # Ensure AWS account is configured
                   Write-Output "Verifying AWS Account has been configured ..."
                 
-                  if ("#{Octopus.Step[Attempt login].Status.Code}" -ne "Succeeded") {
+                  if ("#{Octopus.ProcessTemplate.Action[Attempt login].Status.Code}" -ne "Succeeded") {
                     $errorCollection += @("The previous step failed, which indicates the AWS Account is not valid.")
                     $awsConfigured = $false
                   }
