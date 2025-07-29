@@ -136,7 +136,7 @@ step "validate-setup" {
                 
                     # Set output variable to skip Lambda deployment using variable run condition
                     Set-OctopusVariable -name "AwsLambdaConfigured" -value "False"
-                    Fail-Step
+                    Fail-Step "AWS not configured"
                   }
                   else
                   {
