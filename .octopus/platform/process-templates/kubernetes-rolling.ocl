@@ -110,14 +110,24 @@ parameter "Template.Container" {
     label = "App Container"
 }
 
-step "create-namespace-if-it-does-not-exist" {
-    name = "Create namespace if it does not exist"
+parameter "Template.WindowSize" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Rolling Window Size"
+}
+
+step "deploy-app" {
+    name = "Deploy app"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.MaxParallelism = "#{Template.WindowSize}"
+        Octopus.Action.TargetRoles = "demo-k8s-cluster"
     }
 
-    action {
+    action "create-namespace-if-it-does-not-exist" {
         action_type = "Octopus.KubernetesRunScript"
+        name = "Create namespace if it does not exist"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Script.ScriptFileName = "template-scripts/shared/create-namespace.ps1"
@@ -132,16 +142,10 @@ step "create-namespace-if-it-does-not-exist" {
             repository_uri = "https://github.com/ryanrousseau/wrg-octopus-app.git"
         }
     }
-}
 
-step "apply-deployment" {
-    name = "Apply deployment"
-    properties = {
-        Octopus.Action.TargetRoles = "octopub"
-    }
-
-    action {
+    action "apply-deployment" {
         action_type = "Octopus.KubernetesDeployRawYaml"
+        name = "Apply deployment"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
@@ -174,16 +178,10 @@ step "apply-deployment" {
             }
         }
     }
-}
 
-step "apply-service" {
-    name = "Apply service"
-    properties = {
-        Octopus.Action.TargetRoles = "octopub"
-    }
-
-    action {
+    action "apply-service" {
         action_type = "Octopus.KubernetesDeployRawYaml"
+        name = "Apply service"
         properties = {
             Octopus.Action.GitRepository.Source = "External"
             Octopus.Action.Kubernetes.DeploymentTimeout = "180"
