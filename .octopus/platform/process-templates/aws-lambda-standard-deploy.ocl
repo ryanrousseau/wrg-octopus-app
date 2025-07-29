@@ -70,7 +70,7 @@ step "validate-setup" {
     action {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 # Define variables
                 $errorCollection = @()
@@ -187,6 +187,6 @@ step "validate-setup" {
             Octopus.Action.Script.Syntax = "PowerShell"
             OctopusUseBundledTooling = "False"
         }
-        worker_pool_variable = ""
+        worker_pool_variable = "#{Template.WorkerPool}"
     }
 }
