@@ -69,6 +69,8 @@ jobs:
               TF_VAR_azure_feed_pat: ${{ secrets.AZURE_FEED_PAT }}
               TF_VAR_docker_hub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}
               TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
+              TF_VAR_sales_solutions_access_key: ${{ secrets.SALES_SOLUTIONS_ACCESS_KEY }}
+              TF_VAR_sales_solutions_secret_key: ${{ secrets.SALES_SOLUTIONS_SECRET_KEY }}
             run: terraform apply -auto-approve
     apply-terraform-s3-backend:
         if: vars.BACKEND == 's3'
@@ -116,4 +118,6 @@ jobs:
               TF_VAR_azure_feed_pat: ${{ secrets.AZURE_FEED_PAT }}
               TF_VAR_docker_hub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}
               TF_VAR_platform_hub_git_credential_password: ${{ secrets.PLATFORM_HUB_GIT_CREDENTIAL_PASSWORD }}
+              TF_VAR_sales_solutions_access_key: ${{ secrets.SALES_SOLUTIONS_ACCESS_KEY }}
+              TF_VAR_sales_solutions_secret_key: ${{ secrets.SALES_SOLUTIONS_SECRET_KEY }}
             run: terraform apply -auto-approve

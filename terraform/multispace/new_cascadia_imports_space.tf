@@ -211,6 +211,15 @@ module "new_cascadia_imports_space_docker_registry" {
   password = var.docker_hub_password
 }
 
+module "new_cascadia_imports_space_sales_solutions" {
+  source = "../modules/account/aws"
+
+  name       = "Sales - Solutions"
+  access_key = var.sales_solutions_access_key
+  secret_key = var.sales_solutions_secret_key
+  space_id   = module.new_cascadia_imports_space.id
+}
+
 module "new_cascadia_imports_space_helm_feed" {
   source   = "../modules/feeds/helm_feed"
 

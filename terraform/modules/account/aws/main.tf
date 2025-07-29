@@ -7,9 +7,9 @@ terraform {
 }
 
 resource "octopusdeploy_aws_account" "account" {
-  access_key = "access-key"
-  name = "AWS Account (OK to Delete)"
-  secret_key = "###########" # required; get from secure environment/store
+  access_key = var.access_key
+  name = var.name
+  secret_key = var.secret_key
   space_id = var.space_id
   description = var.description
   environments = var.environments

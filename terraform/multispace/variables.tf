@@ -46,3 +46,13 @@ variable "platform_hub_git_credential_password" {
   type      = string
   sensitive = true
 }
+
+variable "sales_solutions_access_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "sales_solutions_secret_key" {
+  type      = string
+  sensitive = true
+}
