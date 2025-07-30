@@ -255,7 +255,7 @@ step "apply-terraform" {
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" new-certificate --if-blank
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" configure --noListen False --reset-trust --app "c:\octopus\applications" --port "10933"
                 Write-Host "Running register worker..."
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" register-with --server "#{Octopus.Web.ServerUri}" --apiKey "#{DemoSpaceCreator.Octopus.APIKey}" --space "#{Octopus.Space.Name}" --name "$($env:COMPUTERNAME)" --environment "Administration" --role "IIS" --publicHostName $publicDns
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" register-with --server "#{Octopus.Web.ServerUri}" --apiKey "#{Template.Octopus.APIKey}" --space "#{Octopus.Space.Name}" --name "$($env:COMPUTERNAME)" --environment "#{Octopus.Environment.Name}" --role "IIS" --role "#{Octopus.Project.Name}" --publicHostName $publicDns
                 Write-Host "Finished register worker..."
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --install
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --start
@@ -277,7 +277,7 @@ step "apply-terraform" {
                   region = "#{Template.AWS.Region.Code}"
                 }
                 
-                resource "aws_instance" "windows-worker" {
+                resource "aws_instance" "windows-vm" {
                     subnet_id = data.aws_subnets.public.ids[0]   
                     user_data = data.template_file.windows-userdata.rendered
                     ami = "${var.octopus_aws_windows_ami_id}"
