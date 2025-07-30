@@ -51,7 +51,7 @@ parameter "Template.AWS.Prefix" {
     label = "AWS Prefix"
 }
 
-parameter "Template.AWS.SecurityGroupName" {
+parameter "Template.AWS.SecurityGroup.Name" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
     }
