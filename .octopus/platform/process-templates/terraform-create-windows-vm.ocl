@@ -1,6 +1,11 @@
 name = "Terraform - AWS - Create Windows VM"
 description = ""
 
+icon {
+    color = "#3CA4F3"
+    id = "windows"
+}
+
 parameter "Template.Tag" {
     display_settings = {
         Octopus.ControlType = "TargetTags"
