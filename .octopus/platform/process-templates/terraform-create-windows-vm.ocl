@@ -1,6 +1,14 @@
 name = "Terraform - Create Windows VM"
 description = ""
 
+parameter "Template.Tag" {
+    display_settings = {
+        Octopus.ControlType = "TargetTags"
+    }
+    help_text = ""
+    label = "Target Tag"
+}
+
 parameter "Template.AWS.Account" {
     display_settings = {
         Octopus.ControlType = "AmazonWebServicesAccount"
@@ -184,7 +192,7 @@ step "get-aws-resource-ids" {
 }
 
 step "apply-terraform" {
-    name = "Apply terraform"
+    name = "Apply Terraform"
 
     action {
         action_type = "Octopus.TerraformApply"
@@ -316,5 +324,38 @@ step "apply-terraform" {
             feed = "#{Template.Worker.Container.Feed}"
             image = "#{Template.Worker.Container.Image}"
         }
+    }
+}
+
+step "wait" {
+    name = "Wait"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = "Start-Sleep -s 300"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "health-check" {
+    name = "Health Check"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
+    }
+
+    action {
+        action_type = "Octopus.HealthCheck"
+        properties = {
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.Type = "FullHealthCheck"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
     }
 }
