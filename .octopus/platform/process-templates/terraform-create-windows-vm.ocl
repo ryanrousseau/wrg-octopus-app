@@ -1,4 +1,4 @@
-name = "Terraform - Create Windows VM"
+name = "Terraform - AWS - Create Windows VM"
 description = ""
 
 parameter "Template.Tag" {
