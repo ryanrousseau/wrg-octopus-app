@@ -1,2 +1,39 @@
 name = "Delete Kubernetes Namespace"
 description = ""
+
+parameter "Template.Tag" {
+    display_settings = {
+        Octopus.ControlType = "TargetTags"
+    }
+    help_text = ""
+    label = "Target Tag"
+}
+
+parameter "Template.Namespace" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Namespace"
+}
+
+step "delete-namespace" {
+    name = "Delete namespace"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $namespace = $OctopusParameters["Template.Namespace"]
+                
+                kubectl delete namespace $namespace
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
