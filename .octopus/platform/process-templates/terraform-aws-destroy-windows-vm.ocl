@@ -2,7 +2,7 @@ name = "Terraform - AWS - Destroy Windows VM"
 description = ""
 
 icon {
-    color = "#3CA4F3"
+    color = "#CA1E1E"
     id = "windows"
 }
 
@@ -197,11 +197,11 @@ step "get-aws-resource-ids" {
     }
 }
 
-step "apply-terraform" {
-    name = "Apply Terraform"
+step "destroy-terraform-resources" {
+    name = "Destroy Terraform resources"
 
     action {
-        action_type = "Octopus.TerraformApply"
+        action_type = "Octopus.TerraformDestroy"
         properties = {
             Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
             Octopus.Action.AwsAccount.UseInstanceRole = "False"
@@ -333,22 +333,6 @@ step "apply-terraform" {
     }
 }
 
-step "wait" {
-    name = "Wait"
-
-    action {
-        action_type = "Octopus.Script"
-        properties = {
-            Octopus.Action.RunOnServer = "true"
-            Octopus.Action.Script.ScriptBody = "Start-Sleep -s 300"
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
-        }
-        worker_pool_variable = "#{Template.Worker.Pool}"
-    }
-}
-
 step "health-check" {
     name = "Health Check"
     properties = {
@@ -358,8 +342,8 @@ step "health-check" {
     action {
         action_type = "Octopus.HealthCheck"
         properties = {
-            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
-            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsWarnings"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "DoNotAlterMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
