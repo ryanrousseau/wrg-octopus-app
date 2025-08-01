@@ -123,7 +123,7 @@ parameter "Template.Container" {
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -160,7 +160,7 @@ step "create-namespace-if-it-does-not-exist" {
 step "create-service" {
     name = "Create service"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -199,7 +199,7 @@ step "create-service" {
 step "scale-up-existing-deployment" {
     name = "Scale up existing deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -226,7 +226,7 @@ step "scale-up-existing-deployment" {
 step "deploy-canary-phase-1" {
     name = "Deploy canary phase 1"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -284,7 +284,7 @@ step "deploy-canary-phase-1" {
 step "add-canary-pods-to-service" {
     name = "Add canary pods to service"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -339,7 +339,6 @@ step "canary-phase-1-waiting-period" {
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
         }
-        worker_pool_variable = ""
     }
 }
 
@@ -360,7 +359,7 @@ step "approve-canary-phase-1" {
 step "deploy-canary-phase-2" {
     name = "Deploy canary phase 2"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -422,7 +421,7 @@ step "approve-canary-phase-2" {
 step "deploy-canary-phase-3" {
     name = "Deploy canary phase 3"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -488,7 +487,7 @@ step "approve-canary-phase-3" {
 step "update-main" {
     name = "Update main deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -546,7 +545,7 @@ step "update-main" {
 step "remove-canary" {
     name = "Remove canary pods from service"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -585,7 +584,7 @@ step "remove-canary" {
 step "delete-canary-deployment" {
     name = "Delete canary deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -678,7 +677,7 @@ step "rollback-canary-deployment" {
     condition = "Variable"
     name = "Rollback canary deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
         Octopus.Step.ConditionVariableExpression = "#{Octopus.ProcessTemplate.Action[Detect cancelled canary rollout].Output.Cancelled}"
     }
 
