@@ -143,7 +143,7 @@ parameter "Template.Wait.Seconds" {
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -180,7 +180,7 @@ step "create-namespace-if-it-does-not-exist" {
 step "get-active-deployment" {
     name = "Get active deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -216,7 +216,7 @@ step "get-active-deployment" {
 step "create-deployment" {
     name = "Create deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -274,7 +274,7 @@ step "create-deployment" {
 step "create-preview-service" {
     name = "Create preview service"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -350,7 +350,7 @@ step "approval-swap" {
 step "create-service" {
     name = "Create service"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
@@ -389,7 +389,7 @@ step "create-service" {
 step "scale-down-previous-deployment" {
     name = "Scale down previous deployment"
     properties = {
-        Octopus.Action.TargetRoles = "octopub"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action {
