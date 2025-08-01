@@ -7,16 +7,10 @@ module "platform_engineering_team" {
 
   name        = "Platform Engineering Team"
   description = "Global team representing the Platform Engineering team"
-  #external_security_groups = [
-  #    {
-  #        id = "externalGroupId"
-  #        display_name = "External Group Name"
-  #        display_id_and_name = true
-  #    }
-  #]
   users = [
     data.octopusdeploy_users.octopus_config_service_account.users[0].id,
     data.octopusdeploy_users.ryan_rousseau.users[0].id,
-    data.octopusdeploy_users.mark_harrison.users[0].id
+    data.octopusdeploy_users.mark_harrison.users[0].id,
+    data.octopusdeploy_users.grace_rehn.users[0].id
   ]
 }
