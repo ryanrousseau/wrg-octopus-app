@@ -122,7 +122,7 @@ step "deploy-app" {
     name = "Deploy app"
     properties = {
         Octopus.Action.MaxParallelism = "#{Template.WindowSize}"
-        Octopus.Action.TargetRoles = "demo-k8s-cluster"
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
     }
 
     action "create-namespace-if-it-does-not-exist" {
@@ -152,6 +152,31 @@ step "deploy-app" {
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+
+    action "apply-config-map" {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        name = "Apply config map"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: #{Template.Deployment.Name}-config-#{Octopus.Deployment.Id | ToLower}
+                  namespace: #{Template.Cluster.Namespace}
+                data:
+                  RELEASE: #{Octopus.Release.Number}
+                  VERSION: #{Template.Container.PackageVersion}
+                
+                EOT
+            Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
+            Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
     }
@@ -187,6 +212,9 @@ step "deploy-app" {
                           ports:
                             - containerPort: #{Template.Service.Port}
                               name: #{Template.Service.PortName}
+                          envFrom:
+                            - configMapRef:
+                              name: #{Template.Deployment.Name}-config-#{Octopus.Deployment.Id | ToLower}
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/deployment.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
