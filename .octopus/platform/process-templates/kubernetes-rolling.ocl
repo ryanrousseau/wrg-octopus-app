@@ -214,7 +214,7 @@ step "deploy-app" {
                               name: #{Template.Service.PortName}
                           envFrom:
                             - configMapRef:
-                              name: #{Template.Deployment.Name}-config-#{Octopus.Deployment.Id | ToLower}
+                                name: #{Template.Deployment.Name}-config-#{Octopus.Deployment.Id | ToLower}
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-rolling/deployment.yml"
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
