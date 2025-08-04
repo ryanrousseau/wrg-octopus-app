@@ -171,6 +171,7 @@ step "deploy-app" {
                   name: #{Template.Deployment.Name}-config-#{Octopus.Deployment.Id | ToLower}
                   namespace: #{Template.Cluster.Namespace}
                 data:
+                  OPEN_FEATURE_CLIENT_ID: #{Octopus.FeatureToggles.ClientIdentifier}
                   RELEASE: #{Octopus.Release.Number}
                   VERSION: #{Octopus.ProcessTemplate.Action[Apply deployment].Package[app-container].PackageVersion}
                 
