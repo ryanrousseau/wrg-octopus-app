@@ -172,7 +172,7 @@ step "deploy-app" {
                   namespace: #{Template.Cluster.Namespace}
                 data:
                   RELEASE: #{Octopus.Release.Number}
-                  VERSION: #{Octopus.ProcessTemplate.Action[Apply deployment].Package[app-container].Version}
+                  VERSION: #{Octopus.ProcessTemplate.Action[Apply deployment].Package[app-container].PackageVersion}
                 
                 EOT
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
