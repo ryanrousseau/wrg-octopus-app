@@ -220,6 +220,16 @@ module "new_cascadia_imports_space_sales_solutions" {
   space_id   = module.new_cascadia_imports_space.id
 }
 
+module "new_cascadia_imports_space_ecr" {
+  source   = "../modules/feeds/aws_ecr"
+
+  name       = "Sales - Solutions - ECR"
+  access_key = var.sales_solutions_access_key
+  region     = "us-west-2"
+  secret_key = var.sales_solutions_secret_key
+  space_id = module.new_cascadia_imports_space.id
+}
+
 module "new_cascadia_imports_space_helm_feed" {
   source   = "../modules/feeds/helm_feed"
 
