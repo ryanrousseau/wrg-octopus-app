@@ -236,6 +236,48 @@ module "new_cascadia_imports_space_ecr" {
   space_id = module.new_cascadia_imports_space.id
 }
 
+module "new_cascadia_imports_space_ecr_us_west_2" {
+  source   = "../modules/feeds/aws_ecr"
+
+  name                = "Sales - Solutions - ECR - us-west-2"
+  region              = "us-west-2"
+  oidc_authentication = {
+    audience          = ""
+    role_arn          = "arn:aws:iam::381713788115:role/wrg-octopus-app-oidc"
+    session_duration  = "3600"
+    subject_keys      = ["feed", "space"]
+  }
+  space_id            = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_ecr_us_east_1" {
+  source   = "../modules/feeds/aws_ecr"
+
+  name                = "Sales - Solutions - ECR - us-east-1"
+  region              = "us-east-1"
+  oidc_authentication = {
+    audience          = ""
+    role_arn          = "arn:aws:iam::381713788115:role/wrg-octopus-app-oidc"
+    session_duration  = "3600"
+    subject_keys      = ["feed", "space"]
+  }
+  space_id            = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_ecr_sa_east_1" {
+  source   = "../modules/feeds/aws_ecr"
+
+  name                = "Sales - Solutions - ECR - sa-east-1"
+  region              = "sa-east-1"
+  oidc_authentication = {
+    audience          = ""
+    role_arn          = "arn:aws:iam::381713788115:role/wrg-octopus-app-oidc"
+    session_duration  = "3600"
+    subject_keys      = ["feed", "space"]
+  }
+  space_id            = module.new_cascadia_imports_space.id
+}
+
 module "new_cascadia_imports_space_helm_feed" {
   source   = "../modules/feeds/helm_feed"
 
