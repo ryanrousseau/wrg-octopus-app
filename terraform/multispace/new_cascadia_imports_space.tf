@@ -289,6 +289,43 @@ module "new_cascadia_imports_space_temp_project_group" {
   space_id = module.new_cascadia_imports_space.id
 }
 
+module "new_cascadia_imports_space_release_ring_tag_set" {
+  source   = "../modules/tag_set"
+
+  name     = "Release Ring"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_release_ring_alpha" {
+  source   = "../modules/tag"
+
+  color            = "#0d80d8"
+  name             = "Alpha"
+  sort_order       = 0
+  tag_set_id       = module.new_cascadia_imports_space_release_ring_tag_set.id
+  tag_set_space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_release_ring_beta" {
+  source   = "../modules/tag"
+
+  color            = "#0d80d8"
+  name             = "Beta"
+  sort_order       = 1
+  tag_set_id       = module.new_cascadia_imports_space_release_ring_tag_set.id
+  tag_set_space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_release_ring_stable" {
+  source   = "../modules/tag"
+
+  color            = "#0d80d8"
+  name             = "Stable"
+  sort_order       = 2
+  tag_set_id       = module.new_cascadia_imports_space_release_ring_tag_set.id
+  tag_set_space_id = module.new_cascadia_imports_space.id
+}
+
 module "new_cascadia_imports_space_us_west_2" {
   source   = "../modules/tenant"
 
