@@ -214,10 +214,16 @@ module "new_cascadia_imports_space_docker_registry" {
 module "new_cascadia_imports_space_sales_solutions" {
   source = "../modules/account/aws"
 
-  name       = "Sales - Solutions"
-  access_key = var.sales_solutions_access_key
-  secret_key = var.sales_solutions_secret_key
-  space_id   = module.new_cascadia_imports_space.id
+  name                              = "Sales - Solutions"
+  access_key                        = var.sales_solutions_access_key
+  secret_key                        = var.sales_solutions_secret_key
+  tenanted_deployment_participation = "TenantedOrUntenanted"
+  tenants                           = [
+    module.new_cascadia_imports_space_sa_east_1.id,
+    module.new_cascadia_imports_space_us_east_1.id,
+    module.new_cascadia_imports_space_us_west_2.id
+  ]
+  space_id                          = module.new_cascadia_imports_space.id
 }
 
 module "new_cascadia_imports_space_ecr" {
@@ -345,4 +351,31 @@ module "new_cascadia_imports_space_sa_east_1" {
 
   name     = "South America East 1"
   space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_lambda_us_west_2" {
+  source   = "../modules/tenant_project"
+
+  project_id      = data.octopusdeploy_projects.lambda_region_tenants.projects[0].id
+  tenant_id       = module.new_cascadia_imports_space_us_west_2.id
+  environment_ids = [module.new_cascadia_imports_space_dev_test_prod.dev_env_id, module.new_cascadia_imports_space_dev_test_prod.test_env_id, module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
+  space_id        = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_lambda_us_east_1" {
+  source   = "../modules/tenant_project"
+
+  project_id      = data.octopusdeploy_projects.lambda_region_tenants.projects[0].id
+  tenant_id       = module.new_cascadia_imports_space_us_east_1.id
+  environment_ids = [module.new_cascadia_imports_space_dev_test_prod.test_env_id, module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
+  space_id        = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_lambda_sa_east_1" {
+  source   = "../modules/tenant_project"
+
+  project_id      = data.octopusdeploy_projects.lambda_region_tenants.projects[0].id
+  tenant_id       = module.new_cascadia_imports_space_sa_east_1.id
+  environment_ids = [module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
+  space_id        = module.new_cascadia_imports_space.id
 }
