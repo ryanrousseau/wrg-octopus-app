@@ -288,3 +288,24 @@ module "new_cascadia_imports_space_temp_project_group" {
   name     = "Temp"
   space_id = module.new_cascadia_imports_space.id
 }
+
+module "new_cascadia_imports_space_us_west_2" {
+  source   = "../modules/tenant"
+
+  name     = "US West 2"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_us_east_1" {
+  source   = "../modules/tenant"
+
+  name     = "US East 1"
+  space_id = module.new_cascadia_imports_space.id
+}
+
+module "new_cascadia_imports_space_sa_east_1" {
+  source   = "../modules/tenant"
+
+  name     = "South America East 1"
+  space_id = module.new_cascadia_imports_space.id
+}
