@@ -316,6 +316,13 @@ module "new_cascadia_imports_space_lambda_project_group" {
   space_id = module.new_cascadia_imports_space.id
 }
 
+module "new_cascadia_imports_space_ecs_project_group" {
+  source   = "../modules/project_group"
+
+  name     = "ECS"
+  space_id = module.new_cascadia_imports_space.id
+}
+
 module "new_cascadia_imports_space_machines_project_group" {
   source   = "../modules/project_group"
 
