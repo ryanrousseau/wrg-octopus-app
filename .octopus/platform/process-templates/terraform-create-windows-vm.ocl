@@ -274,6 +274,8 @@ step "apply-terraform" {
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --install
                 & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --start
                 
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" watchdog --create --instances * --interval 2
+                
                 # Install .net sdks
                 choco install dotnet-6.0-sdk -y
                 choco install dotnet-8.0-sdk -y
