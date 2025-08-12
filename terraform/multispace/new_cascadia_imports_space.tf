@@ -298,21 +298,14 @@ module "new_cascadia_imports_space_azure_feed" {
 module "new_cascadia_imports_space_templates_project_group" {
   source   = "../modules/project_group"
 
-  name     = "Templates"
-  space_id = module.new_cascadia_imports_space.id
-}
-
-module "new_cascadia_imports_space_kubernetes_project_group" {
-  source   = "../modules/project_group"
-
-  name     = "Kubernetes"
+  name     = "Ω Templates"
   space_id = module.new_cascadia_imports_space.id
 }
 
 module "new_cascadia_imports_space_lambda_project_group" {
   source   = "../modules/project_group"
 
-  name     = "Lambda"
+  name     = "Loan Pilot"
   space_id = module.new_cascadia_imports_space.id
 }
 
@@ -326,21 +319,14 @@ module "new_cascadia_imports_space_ecs_project_group" {
 module "new_cascadia_imports_space_machines_project_group" {
   source   = "../modules/project_group"
 
-  name     = "Machines"
+  name     = "WealthCompass"
   space_id = module.new_cascadia_imports_space.id
 }
 
 module "new_cascadia_imports_space_octopub_project_group" {
   source   = "../modules/project_group"
 
-  name     = "Octopub"
-  space_id = module.new_cascadia_imports_space.id
-}
-
-module "new_cascadia_imports_space_temp_project_group" {
-  source   = "../modules/project_group"
-
-  name     = "Temp"
+  name     = "Insurance Wise"
   space_id = module.new_cascadia_imports_space.id
 }
 
