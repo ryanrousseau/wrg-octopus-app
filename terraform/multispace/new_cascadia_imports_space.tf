@@ -319,7 +319,7 @@ module "new_cascadia_imports_space_lambda_project_group" {
 module "new_cascadia_imports_space_ecs_project_group" {
   source   = "../modules/project_group"
 
-  name     = "ECS"
+  name     = "BankEase"
   space_id = module.new_cascadia_imports_space.id
 }
 
