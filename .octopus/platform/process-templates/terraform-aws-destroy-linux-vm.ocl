@@ -1,8 +1,8 @@
-name = "Terraform - AWS - Create Linux VM"
+name = "Terraform - AWS - Destroy Linux VM"
 description = ""
 
 icon {
-    color = "#3CA4F3"
+    color = "#CA1E1E"
     id = "linux"
 }
 
@@ -79,14 +79,6 @@ parameter "Template.AWS.Windows.AMI.Search.Name" {
     }
     help_text = ""
     label = "AWS Windows AMI Search Name"
-}
-
-parameter "Template.Octopus.Domain" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = ""
-    label = "Octopus Domain"
 }
 
 parameter "Template.Octopus.ApiKey" {
@@ -205,11 +197,11 @@ step "get-aws-resource-ids" {
     }
 }
 
-step "apply-terraform" {
-    name = "Apply Terraform"
+step "destroy-terraform-resources" {
+    name = "Destroy Terraform resources"
 
     action {
-        action_type = "Octopus.TerraformApply"
+        action_type = "Octopus.TerraformDestroy"
         properties = {
             Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
             Octopus.Action.AwsAccount.UseInstanceRole = "False"
@@ -244,22 +236,6 @@ step "apply-terraform" {
                     
                 }
                 
-                data "aws_ami" "ubuntu" {
-                    most_recent = true
-
-                    filter {
-                        name   = "name"
-                        values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-                    }
-
-                    filter {
-                        name   = "virtualization-type"
-                        values = ["hvm"]
-                    }
-
-                    owners = ["099720109477"] # Canonical
-                }
-
                 data "aws_subnets" "public" {
                   filter {
                     name   = "vpc-id"
@@ -271,51 +247,41 @@ step "apply-terraform" {
                   value = data.aws_subnets.public.ids
                 }
                 
-                data "template_file" "linux-userdata" {
+                data "template_file" "windows-userdata" {
                     template = <<EOF
-                #!/bin/bash
-
-                domain="#{Template.Octopus.Domain}"
-                apikey="#{Template.Octopus.ApiKey}"
-                space="#{Octopus.Space.Name}"
-                environment="#{Octopus.Environment.Name}"
-                tags="#{Template.Tag}"
-                tenant="#{Octopus.Tenant.Name}"
-
-                serverUrl="https://$domain"   # The url of your Octopus server
-                serverCommsPort=443            # The communication port the Octopus Server is listening on (10943 by default)
-                apiKey=$apikey
-                spaceName=$space #"White Rock Global" # The name of the space to register the Tentacle in
-                name=$HOSTNAME      # The name of the Tentacle at is will appear in the Octopus portal
-                rolesArg=$tags   # The role to assign to the Tentacle
-                configFilePath="/etc/octopus/default/tentacle-default.config"
-                applicationPath="/home/Octopus/Applications/"
-                serverCommsAddress="https://polling.$domain" #demo.octopus.app"
-
-                IFS=',' read -r -a roles <<< "$rolesArg"
-
-                apt update -y && sudo apt install -y --no-install-recommends gnupg curl ca-certificates apt-transport-https && \
-                install -m 0755 -d /etc/apt/keyrings && \
-                curl -fsSL https://apt.octopus.com/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/octopus.gpg && \
-                chmod a+r /etc/apt/keyrings/octopus.gpg && \
-                echo \
-                "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/octopus.gpg] https://apt.octopus.com/ \
-                stable main" | \
-                tee /etc/apt/sources.list.d/octopus.list > /dev/null && \
-                apt update -y && sudo apt install tentacle -y
+                    <powershell>
+                Install-WindowsFeature -name Web-Server -IncludeManagementTools
+                New-NetFirewallRule -DisplayName "Octopus Tentacle" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 10933
                 
+                # Install chocolaty
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+                      
+                # Set temp location
+                $env:TEMP = "c:\temp"
+                $env:TMP = "c:\temp"
                 
-                wget https://github.com/PowerShell/PowerShell/releases/download/v7.5.2/powershell_7.5.2-1.deb_amd64.deb
-                sudo dpkg -i powershell_7.5.2-1.deb_amd64.deb
-                sudo apt-get install -f -y
-                rm powershell_7.5.2-1.deb_amd64.deb
-
-                /opt/octopus/tentacle/Tentacle create-instance --config "$configFilePath"
-                /opt/octopus/tentacle/Tentacle new-certificate --if-blank
-                /opt/octopus/tentacle/Tentacle configure --noListen True --reset-trust --app "$applicationPath"
-                echo "Registering the Tentacle $name with server $serverUrl in environment $environment with role $role"
-                /opt/octopus/tentacle/Tentacle register-with --server "$serverUrl" --apiKey "$apiKey" --space "$spaceName" --name "$name" --env "$environment" --comms-style "TentacleActive" --server-comms-port $serverCommsPort --server-comms-address $serverCommsAddress --role "$tags" --tenanted-deployment-participation TenantedOrUntenanted
-                /opt/octopus/tentacle/Tentacle service --install --start
+                # Use chocolaty to install tentacle
+                choco install octopusdeploy.tentacle -y
+                
+                # Configure tentacle
+                $publicDns = (Invoke-RestMethod http://169.254.169.254/latest/meta-data/public-hostname)
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" create-instance --config "c:\octopus\home"
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" new-certificate --if-blank
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" configure --noListen False --reset-trust --app "c:\octopus\applications" --port "10933"
+                Write-Host "Running register worker..."
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" register-with --server "#{Octopus.Web.ServerUri}" --apiKey "#{Template.Octopus.APIKey}" --space "#{Octopus.Space.Name}" --name "$($env:COMPUTERNAME)" --environment "#{Octopus.Environment.Name}" --role "IIS" --role "#{Octopus.Project.Name}" --publicHostName $publicDns
+                Write-Host "Finished register worker..."
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --install
+                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --start
+                
+                # Install .net sdks
+                choco install dotnet-6.0-sdk -y
+                choco install dotnet-8.0-sdk -y
+                
+                # Install PowerShell Core
+                choco install powershell-core -y
+                
+                    </powershell>
                     EOF
                 }
                 
@@ -325,14 +291,14 @@ step "apply-terraform" {
                   region = "#{Template.AWS.Region.Code}"
                 }
                 
-                resource "aws_instance" "ubuntu-vm" {
+                resource "aws_instance" "windows-vm" {
                     subnet_id = data.aws_subnets.public.ids[0]   
-                    user_data = data.template_file.linux-userdata.rendered
-                    ami = data.aws_ami.ubuntu.id
+                    user_data = data.template_file.windows-userdata.rendered
+                    ami = "${var.octopus_aws_windows_ami_id}"
                     instance_type = "t3.medium"
                     key_name = "#{Template.AWS.KeyPair.Name}"
-                    vpc_security_group_ids = ["${var.octopus_aws_security_group_id}"]
-                    get_password_data = false
+                    security_groups = ["${var.octopus_aws_security_group_id}"]
+                    get_password_data = true
                 
                     # root disk
                     root_block_device {
@@ -341,7 +307,7 @@ step "apply-terraform" {
                     }
                 
                     tags = {
-                        Name = "Ubuntu Ec2"
+                        Name = "Windows IIS Ec2"
                     }
                 }
                 
@@ -349,8 +315,14 @@ step "apply-terraform" {
                     type = string
                     default = "#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}"
                 }
+                
+                variable "octopus_aws_windows_ami_id" {
+                    type = string
+                    default = "#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.WindowsAMIId}"
+                }
+                
                 EOT
-            Octopus.Action.Terraform.TemplateParameters = "{\"octopus_aws_security_group_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}\"}"
+            Octopus.Action.Terraform.TemplateParameters = "{\"octopus_aws_security_group_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}\",\"octopus_aws_windows_ami_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.WindowsAMIId}\"}"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
 
@@ -358,22 +330,6 @@ step "apply-terraform" {
             feed = "#{Template.Worker.Container.Feed}"
             image = "#{Template.Worker.Container.Image}"
         }
-    }
-}
-
-step "wait" {
-    name = "Wait"
-
-    action {
-        action_type = "Octopus.Script"
-        properties = {
-            Octopus.Action.RunOnServer = "true"
-            Octopus.Action.Script.ScriptBody = "Start-Sleep -s 300"
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
-        }
-        worker_pool_variable = "#{Template.Worker.Pool}"
     }
 }
 
@@ -386,8 +342,8 @@ step "health-check" {
     action {
         action_type = "Octopus.HealthCheck"
         properties = {
-            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
-            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsWarnings"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "DoNotAlterMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
