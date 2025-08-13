@@ -1,0 +1,389 @@
+name = "Terraform - AWS - Create Linux VM"
+description = ""
+
+icon {
+    color = "#3CA4F3"
+    id = "linux"
+}
+
+parameter "Template.Tag" {
+    display_settings = {
+        Octopus.ControlType = "TargetTags"
+    }
+    help_text = ""
+    label = "Target Tag"
+}
+
+parameter "Template.AWS.Account" {
+    display_settings = {
+        Octopus.ControlType = "AmazonWebServicesAccount"
+    }
+    help_text = ""
+    label = "AWS Account"
+}
+
+parameter "Template.AWS.Region.Code" {
+    display_settings = {
+        Octopus.ControlType = "Select"
+        Octopus.SelectOptions = <<-EOT
+            us-east-1|US East (N. Virginia)
+            us-west-1|US West (N. California)
+            us-west-2|US West (Oregon)
+            af-south-1|Africa (Cape Town)
+            eu-central-1|Europe (Frankfurt)
+            EOT
+    }
+    help_text = ""
+    label = "AWS Region Code"
+
+    value "us-west-1" {}
+}
+
+parameter "Template.AWS.KeyPair.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS Key Pair Name"
+
+    value "" {}
+}
+
+parameter "Template.AWS.Prefix" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS Prefix"
+}
+
+parameter "Template.AWS.SecurityGroup.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS Security Group Name"
+}
+
+parameter "Template.AWS.VPC.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS VPC Name"
+}
+
+parameter "Template.AWS.Windows.AMI.Search.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS Windows AMI Search Name"
+}
+
+parameter "Template.Octopus.Domain" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Octopus Domain"
+}
+
+parameter "Template.Octopus.ApiKey" {
+    display_settings = {
+        Octopus.ControlType = "Sensitive"
+    }
+    help_text = ""
+    label = "Octopus API Key"
+}
+
+parameter "Template.Worker.Pool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+parameter "Template.Worker.Container.Feed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = "Worker Container Feed"
+}
+
+parameter "Template.Worker.Container.Image" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Worker Container Image"
+
+    value "octopusdeploy/worker-tools:ubuntu.22.04" {}
+}
+
+parameter "Template.AWS.S3.Bucket" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "AWS S3 Bucket"
+}
+
+step "get-aws-resource-ids" {
+    name = "Get AWS Resource Ids"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                # Get the VPC
+                $awsVpc = (aws ec2 describe-vpcs --filter Name=tag:Name,Values="#{Template.AWS.VPC.Name}" --output json | ConvertFrom-Json)
+                
+                # Set output variable for Vpc id
+                Write-Host "Setting output variable VpcId with value $($awsVpc.Vpcs[0].VpcId)"
+                Set-OctopusVariable -name "VpcId" -value $awsVpc.Vpcs[0].VpcId
+                
+                # Get Security Group Id
+                $awsSecurityGroup = (aws ec2 describe-security-groups --filter Name=tag:Name,Values="#{Template.AWS.SecurityGroup.Name}" --output json | ConvertFrom-Json)
+                
+                # Set output variable for security group id
+                Write-Host "Setting output variable SecurityGroupId with value $($awsSecurityGroup.SecurityGroups[0].GroupId)"
+                Set-OctopusVariable -Name "SecurityGroupId" -value $awsSecurityGroup.SecurityGroups[0].GroupId
+                
+                # Get Subnets
+                $awsSubnets = (aws ec2 describe-subnets --filter Name=vpc-id,Values="$($awsVpc.Vpcs[0].VpcId)" Name=tag:Name,Values="#{Template.AWS.Prefix}-subnet*" --output json | ConvertFrom-Json)
+                
+                # Loop through results and record subnet ids
+                $subnetIds = @()
+                foreach ($subnet in $awsSubnets.Subnets)
+                {
+                	# Add subnet id to array
+                    $subnetIds += $subnet.SubnetId
+                }
+                
+                # Set the subnet id output variable
+                Write-Host "Setting output variable SubnetIds with value $("$($subnetIds | Join-String -DoubleQuote -Separator ',')")"
+                Set-OctopusVariable -Name "SubnetIds" -value "$($subnetIds | Join-String -DoubleQuote -Separator ',')"
+                
+                # Get the Internet Gateway
+                $awsInternetGateway = (aws ec2 describe-internet-gateways --filter Name="attachment.vpc-id",Values="$($awsVpc.Vpcs[0].VpcId)" --output json | ConvertFrom-Json)
+                
+                # Set the internet gateway output variable
+                Write-Host "Setting output variable InternetGatewayId with value $($awsInternetGateway.InternetGateways[0].InternetGatewayId)"
+                Set-OctopusVariable -Name "InternetGatewayId" -value $awsInternetGateway.InternetGateways[0].InternetGatewayId
+                
+                # Get windows ami
+                $windowsImages = (aws ec2 describe-images --filters "Name=virtualization-type,Values=hvm" "Name=root-device-type,Values=ebs" "Name=ena-support,Values=true" "Name=name,Values=*#{Template.AWS.Windows.AMI.Search.Name}*" "Name=owner-alias,Values=amazon" --region "#{Template.AWS.Region.Code}" | ConvertFrom-Json)
+                
+                # Filter out TPM instances
+                $windowsImages.Images = ($windowsImages.Images | Where-Object {$_.Name -notlike "*TPM*"})
+                
+                # Sort list by creationdate and choose the latest version
+                $windowsImage = ($windowsImages.Images | Sort-Object -Property {$_.CreationDate} -Descending)[0]
+                
+                # Set the ami id output variable
+                Write-Host "Setting output variable WindowsAMIId with value $($windowsImage.ImageId)"
+                Set-OctopusVariable -Name "WindowsAMIId" -value $windowsImage.ImageId
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
+
+        container {
+            feed = "#{Template.Worker.Container.Feed}"
+            image = "#{Template.Worker.Container.Image}"
+        }
+    }
+}
+
+step "apply-terraform" {
+    name = "Apply Terraform"
+
+    action {
+        action_type = "Octopus.TerraformApply"
+        properties = {
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "False"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "AWS"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                
+                  required_version = ">=0.12"
+                  
+                  required_providers {
+                    aws = {
+                      source  = "hashicorp/aws"
+                      version = "~> 3.0"
+                    }
+                  }
+                  
+                  backend "s3" {
+                    bucket = "#{Template.AWS.S3.Bucket}"
+                    key = "windows-ec2.json"
+                    region = "#{Template.AWS.Region.Code}"
+                  }
+                    
+                }
+                
+                data "aws_ami" "ubuntu" {
+                    most_recent = true
+
+                    filter {
+                        name   = "name"
+                        values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+                    }
+
+                    filter {
+                        name   = "virtualization-type"
+                        values = ["hvm"]
+                    }
+
+                    owners = ["099720109477"] # Canonical
+                }
+
+                data "aws_subnets" "public" {
+                  filter {
+                    name   = "vpc-id"
+                    values = ["#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.VpcId}"]
+                  }
+                }
+                
+                output "public_subnet_ids" {
+                  value = data.aws_subnets.public.ids
+                }
+                
+                data "template_file" "linux-userdata" {
+                    template = <<EOF
+                #!/bin/bash
+
+                domain="#{Template.Octopus.Domain}"
+                apikey="#{Template.Octopus.ApiKey}"
+                space="#{Octopus.Space.Name}"
+                environment="#{Octopus.Environment.Name}"
+                tags="#{Template.Tag}"
+                tenant="#{Octopus.Tenant.Name}"
+
+                serverUrl="https://$domain"   # The url of your Octopus server
+                serverCommsPort=443            # The communication port the Octopus Server is listening on (10943 by default)
+                apiKey=$apikey
+                spaceName=$space #"White Rock Global" # The name of the space to register the Tentacle in
+                name=$HOSTNAME      # The name of the Tentacle at is will appear in the Octopus portal
+                rolesArg=$tags   # The role to assign to the Tentacle
+                configFilePath="/etc/octopus/default/tentacle-default.config"
+                applicationPath="/home/Octopus/Applications/"
+                serverCommsAddress="https://polling.$domain" #demo.octopus.app"
+
+                IFS=',' read -r -a roles <<< "$rolesArg"
+
+                apt update -y && sudo apt install -y --no-install-recommends gnupg curl ca-certificates apt-transport-https && \
+                install -m 0755 -d /etc/apt/keyrings && \
+                curl -fsSL https://apt.octopus.com/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/octopus.gpg && \
+                chmod a+r /etc/apt/keyrings/octopus.gpg && \
+                echo \
+                "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/octopus.gpg] https://apt.octopus.com/ \
+                stable main" | \
+                tee /etc/apt/sources.list.d/octopus.list > /dev/null && \
+                apt update -y && sudo apt install tentacle -y
+
+                /opt/octopus/tentacle/Tentacle create-instance --config "$configFilePath"
+                /opt/octopus/tentacle/Tentacle new-certificate --if-blank
+                /opt/octopus/tentacle/Tentacle configure --noListen True --reset-trust --app "$applicationPath"
+                echo "Registering the Tentacle $name with server $serverUrl in environment $environment with role $role"
+                /opt/octopus/tentacle/Tentacle register-with --server "$serverUrl" --apiKey "$apiKey" --space "$spaceName" --name "$name" --env "$environment" --comms-style "TentacleActive" --server-comms-port $serverCommsPort --server-comms-address $serverCommsAddress --role "$tags" --tenanted-deployment-participation TenantedOrUntenanted
+                /opt/octopus/tentacle/Tentacle service --install --start
+                    EOF
+                }
+                
+                
+                # Configure the AWS Provider
+                provider "aws" {
+                  region = "#{Template.AWS.Region.Code}"
+                }
+                
+                resource "aws_instance" "ubuntu-vm" {
+                    subnet_id = data.aws_subnets.public.ids[0]   
+                    user_data = data.template_file.linux-userdata.rendered
+                    ami = data.aws_ami.ubuntu.id
+                    instance_type = "t3.medium"
+                    key_name = "#{Template.AWS.KeyPair.Name}"
+                    vpc_security_group_ids = ["${var.octopus_aws_security_group_id}"]
+                    get_password_data = false
+                
+                    # root disk
+                    root_block_device {
+                        volume_size           = "70"
+                        delete_on_termination = true
+                    }
+                
+                    tags = {
+                        Name = "Ubuntu Ec2"
+                    }
+                }
+                
+                variable "octopus_aws_security_group_id" {
+                    type = string
+                    default = "#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}"
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{\"octopus_aws_security_group_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}\"}"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
+
+        container {
+            feed = "#{Template.Worker.Container.Feed}"
+            image = "#{Template.Worker.Container.Image}"
+        }
+    }
+}
+
+step "wait" {
+    name = "Wait"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = "Start-Sleep -s 300"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
+    }
+}
+
+step "health-check" {
+    name = "Health Check"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
+    }
+
+    action {
+        action_type = "Octopus.HealthCheck"
+        properties = {
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.Type = "FullHealthCheck"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
+    }
+}
