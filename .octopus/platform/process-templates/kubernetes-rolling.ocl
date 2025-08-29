@@ -134,7 +134,7 @@ step "deploy-app" {
                 $clusterNamespace = $OctopusParameters["Template.Cluster.Namespace"]
                 
                 # Get existing namespaces
-                Write-Host "Retrieving namespaces ..."
+                Write-Host "Retrieving namespaces ... "
                 $namespaces = (kubectl get namespaces -o JSON | ConvertFrom-Json)
                 
                 # Check to see if namespace exists
