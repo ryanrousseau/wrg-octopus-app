@@ -293,6 +293,8 @@ step "run-attestation-verification-on-build-artifacts" {
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
                 
+                aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 381713788115.dkr.ecr.us-west-2.amazonaws.com
+                
                 $objectArray = @()
                 foreach ($key in $OctopusParameters.Keys)
                 {
