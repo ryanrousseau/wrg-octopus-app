@@ -127,7 +127,16 @@ step "verify-docker-containers" {
                     $packageVersion = $OctopusParameters[$packageVersionKey]
                     Write-Host "The package version is $packageVersion"
                 
+                    $packageRegistryKey = $key -replace ".PackageId", ".Registry"
+                    Write-Host "The package registry key is $packageRegistryKey"
+                    $packageRegistry = $OctopusParameters[$packageRegistryKey]
+                    Write-Host "The package registry is $packageRegistry"
+                
                     $packageVersionToVerify = "$($packageId):$($packageVersion)"
+                
+                    if (-not [string]::IsNullOrEmpty($packageRegistry)) {
+                      $packageVersionToVerify = "$packageRegistry/$packageVersionToVerify"
+                    }
                 
                     if ($objectArray -contains "$packageVersionToVerify")
                     {
