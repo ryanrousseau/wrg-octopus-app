@@ -190,7 +190,7 @@ step "verify-docker-containers" {
                   
                   if ($packageItem.Contains("/"))
                   {
-                      $imageToAttest = "oci://$packageItem"
+                      $imageToAttest = "oci://381713788115.dkr.ecr.us-west-2.amazonaws.com/$packageItem"
                 
                       Write-Host "Attesting to $imageToAttest in the repo $githubLessUrl"
                       $attestation=gh attestation verify "$imageToAttest" --repo $githubLessUrl --format json 
