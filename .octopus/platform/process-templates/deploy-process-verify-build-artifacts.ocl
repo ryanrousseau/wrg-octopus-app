@@ -38,14 +38,6 @@ parameter "Template.Verify.ExecutionContainerFeed" {
     label = "Verify Container Feed"
 }
 
-parameter "Template.AWS.Account" {
-    display_settings = {
-        Octopus.ControlType = "AmazonWebServicesAccount"
-    }
-    help_text = ""
-    label = "AWS Account"
-}
-
 step "attach-sbom-to-release" {
     name = "Attach SBOM to Release"
 
