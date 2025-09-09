@@ -106,7 +106,6 @@ step "verify-docker-containers" {
 
     action {
         action_type = "Octopus.Script"
-        is_disabled = true
         is_required = true
         notes = <<-EOT
                 **Always Runs**
@@ -136,16 +135,7 @@ step "verify-docker-containers" {
                     $packageVersion = $OctopusParameters[$packageVersionKey]
                     Write-Host "The package version is $packageVersion"
                 
-                    $packageRegistryKey = $key -replace ".PackageId", ".Registry"
-                    Write-Host "The package registry key is $packageRegistryKey"
-                    $packageRegistry = $OctopusParameters[$packageRegistryKey]
-                    Write-Host "The package registry is $packageRegistry"
-                
                     $packageVersionToVerify = "$($packageId):$($packageVersion)"
-                
-                    if (-not [string]::IsNullOrEmpty($packageRegistry)) {
-                      $packageVersionToVerify = "$packageRegistry/$packageVersionToVerify"
-                    }
                 
                     if ($objectArray -contains "$packageVersionToVerify")
                     {
@@ -199,7 +189,7 @@ step "verify-docker-containers" {
                   
                   if ($packageItem.Contains("/"))
                   {
-                      $imageToAttest = "oci://381713788115.dkr.ecr.us-west-2.amazonaws.com/$packageItem"
+                      $imageToAttest = "oci://$packageItem"
                 
                       Write-Host "Attesting to $imageToAttest in the repo $githubLessUrl"
                       $attestation=gh attestation verify "$imageToAttest" --repo $githubLessUrl --format json 
@@ -281,6 +271,7 @@ step "run-attestation-verification-on-build-artifacts" {
 
     action {
         action_type = "Octopus.AwsRunScript"
+        is_disabled = true
         properties = {
             Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "us-west-2"
