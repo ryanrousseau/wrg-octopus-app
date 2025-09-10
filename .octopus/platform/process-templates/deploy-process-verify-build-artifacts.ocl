@@ -38,6 +38,14 @@ parameter "Template.Verify.ExecutionContainerFeed" {
     label = "Verify Container Feed"
 }
 
+parameter "Template.Docker.Account" {
+    display_settings = {
+        Octopus.ControlType = "UsernamePasswordAccount"
+    }
+    help_text = ""
+    label = "Docker Account"
+}
+
 step "attach-sbom-to-release" {
     name = "Attach SBOM to Release"
 
