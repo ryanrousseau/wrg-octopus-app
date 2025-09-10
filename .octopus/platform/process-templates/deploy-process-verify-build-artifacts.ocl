@@ -117,11 +117,14 @@ step "verify-docker-containers" {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $gitHubToken = $OctopusParameters["Template.Git.AuthToken"]
                 
-                $dockerUser = $OctopusParameters["Template.Docker.Account.Username"]
-                $dockerPassword = $OctopusParameters["Template.Docker.Account.Password"]
+                $dockerAccountVariable = $OctopusParameters["Template.Docker.Account"]
+                $dockerUser = $OctopusParameters["$($dockerAccountVariable).Username"]
+                $dockerPassword = $OctopusParameters["$($dockerAccountVariable).Password"]
                 
                 Write-Host "Docker user: $dockerUser"
                 Write-Host "Docker password: $dockerPassword"
+                
+                docker login --username $dockerUser --password $dockerPassword
                 
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
