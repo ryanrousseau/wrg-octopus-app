@@ -118,6 +118,14 @@ parameter "Template.WindowSize" {
     label = "Rolling Window Size"
 }
 
+parameter "Template.Application.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Application Name"
+}
+
 step "deploy-app" {
     name = "Deploy app"
     properties = {
@@ -174,7 +182,7 @@ step "deploy-app" {
                   OPEN_FEATURE_CLIENT_ID: #{Octopus.FeatureToggles.ClientIdentifier}
                   RELEASE: #{Octopus.Release.Number}
                   VERSION: #{Octopus.ProcessTemplate.Action[Apply deployment].Package[app-container].PackageVersion}
-                
+                  APPLICATION_NAME: #{Template.Application.Name}
                 EOT
             Octopus.Action.KubernetesContainers.Namespace = "#{Project.Cluster.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
