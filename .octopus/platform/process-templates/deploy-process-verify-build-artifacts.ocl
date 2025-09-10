@@ -38,6 +38,14 @@ parameter "Template.Verify.ExecutionContainerFeed" {
     label = "Verify Container Feed"
 }
 
+parameter "Template.Docker.Account" {
+    display_settings = {
+        Octopus.ControlType = "UsernamePasswordAccount"
+    }
+    help_text = ""
+    label = "Docker Account"
+}
+
 step "attach-sbom-to-release" {
     name = "Attach SBOM to Release"
 
@@ -109,14 +117,14 @@ step "verify-docker-containers" {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $gitHubToken = $OctopusParameters["Template.Git.AuthToken"]
                 
-                #$dockerAccountVariable = $OctopusParameters["Template.Docker.Account"]
-                #$dockerUser = $OctopusParameters["$($dockerAccountVariable).Username"]
-                #$dockerPassword = $OctopusParameters["$($dockerAccountVariable).Password"]
+                $dockerAccountVariable = $OctopusParameters["Template.Docker.Account"]
+                $dockerUser = $OctopusParameters["$($dockerAccountVariable).Username"]
+                $dockerPassword = $OctopusParameters["$($dockerAccountVariable).Password"]
                 
                 #Write-Host "Docker user: $dockerUser"
                 #Write-Host "Docker password: $dockerPassword"
                 
-                #docker login --username $dockerUser --password $dockerPassword
+                docker login --username $dockerUser --password $dockerPassword
                 
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
