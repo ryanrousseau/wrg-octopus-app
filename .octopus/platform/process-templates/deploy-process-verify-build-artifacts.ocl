@@ -101,7 +101,7 @@ step "attach-sbom-to-release" {
 }
 
 step "verify-docker-containers" {
-    name = "Run Attestation Verification on Build Artifacts - old"
+    name = "Run Attestation Verification on Build Artifacts"
     start_trigger = "StartWithPrevious"
 
     action {
@@ -124,7 +124,7 @@ step "verify-docker-containers" {
                 Write-Host "Docker user: $dockerUser"
                 Write-Host "Docker password: $dockerPassword"
                 
-                docker login --username $dockerUser --password $dockerPassword
+                #docker login --username $dockerUser --password $dockerPassword
                 
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
@@ -276,7 +276,7 @@ step "verify-docker-containers" {
 }
 
 step "run-attestation-verification-on-build-artifacts" {
-    name = "Run Attestation Verification on Build Artifacts"
+    name = "Run Attestation Verification on Build Artifacts - WIP"
 
     action {
         action_type = "Octopus.AwsRunScript"
