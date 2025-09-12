@@ -46,6 +46,14 @@ parameter "Template.AWS.Account" {
     label = "AWS Account"
 }
 
+parameter "Template.ECR.Feed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = "ECR Feed"
+}
+
 step "attach-sbom-to-release" {
     name = "Attach SBOM to Release"
 
