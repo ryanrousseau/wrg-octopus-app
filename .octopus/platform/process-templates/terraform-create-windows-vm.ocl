@@ -250,7 +250,8 @@ step "apply-terraform" {
                 data "template_file" "windows-userdata" {
                     template = <<EOF
                     <powershell>
-                Install-WindowsFeature -name Web-Server -IncludeManagementTools
+                Install-WindowsFeature -name Web-Server -IncludeManagementTools -IncludeAllSubFeature
+                Remove-IISSite -Name "Default Web Site" -Confirm:$false
                 New-NetFirewallRule -DisplayName "Octopus Tentacle" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 10933
                 
                 # Install chocolaty
@@ -282,8 +283,6 @@ step "apply-terraform" {
                 
                 # Install PowerShell Core
                 choco install powershell-core -y
-                
-                Remove-IISSite -Name "Default Web Site"
                 
                     </powershell>
                     EOF
