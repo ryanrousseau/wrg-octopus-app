@@ -250,7 +250,7 @@ step "apply-terraform" {
                 data "template_file" "windows-userdata" {
                     template = <<EOF
                     <powershell>
-                Install-WindowsFeature -name Web-Server -IncludeManagementTools -IncludeAllSubFeature
+                Install-WindowsFeature -name Web-Server -IncludeManagementTools
                 New-NetFirewallRule -DisplayName "Octopus Tentacle" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 10933
                 
                 # Install chocolaty
