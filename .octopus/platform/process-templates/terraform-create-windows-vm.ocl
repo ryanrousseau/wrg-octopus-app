@@ -251,7 +251,6 @@ step "apply-terraform" {
                     template = <<EOF
                     <powershell>
                 Install-WindowsFeature -name Web-Server -IncludeManagementTools -IncludeAllSubFeature
-                Remove-IISSite -Name "Default Web Site" -Confirm:$false
                 New-NetFirewallRule -DisplayName "Octopus Tentacle" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 10933
                 
                 # Install chocolaty
@@ -365,5 +364,24 @@ step "health-check" {
             Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
         }
+    }
+}
+
+step "bootstrap-target" {
+    name = "Bootstrap target"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
+    }
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = "Remove-IISSite -Name \"Default Web Site\" -Confirm:$false"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
     }
 }
