@@ -283,6 +283,8 @@ step "apply-terraform" {
                 # Install PowerShell Core
                 choco install powershell-core -y
                 
+                Remove-IISSite -Name "Default Web Site"
+                
                     </powershell>
                     EOF
                 }
@@ -364,6 +366,5 @@ step "health-check" {
             Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
         }
-        worker_pool_variable = "#{Template.Worker.Pool}"
     }
 }
