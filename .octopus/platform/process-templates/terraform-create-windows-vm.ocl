@@ -279,6 +279,7 @@ step "apply-terraform" {
                 # Install .net sdks
                 choco install dotnet-6.0-sdk -y
                 choco install dotnet-8.0-sdk -y
+                choco install dotnet-9.0-sdk -y
                 
                 # Install PowerShell Core
                 choco install powershell-core -y
