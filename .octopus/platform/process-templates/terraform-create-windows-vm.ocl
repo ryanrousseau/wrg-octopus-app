@@ -280,7 +280,6 @@ step "apply-terraform" {
                 choco install dotnet-6.0-sdk -y
                 choco install dotnet-8.0-sdk -y
                 choco install dotnet-9.0-sdk -y
-                choco install dotnet-aspnetcoremodule-v2 -y
                 
                 # Install PowerShell Core
                 choco install powershell-core -y
@@ -379,7 +378,11 @@ step "bootstrap-target" {
         action_type = "Octopus.Script"
         properties = {
             Octopus.Action.RunOnServer = "false"
-            Octopus.Action.Script.ScriptBody = "Remove-IISSite -Name \"Default Web Site\" -Confirm:$false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                Remove-IISSite -Name "Default Web Site" -Confirm:$false
+                
+                choco install dotnet-aspnetcoremodule-v2 -y
+                EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
             OctopusUseBundledTooling = "False"
