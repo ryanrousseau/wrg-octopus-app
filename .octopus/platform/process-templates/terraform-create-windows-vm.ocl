@@ -283,6 +283,9 @@ step "apply-terraform" {
                 
                 # Install PowerShell Core
                 choco install powershell-core -y
+
+                choco install gh -y
+                choco install trivy -y
                 
                     </powershell>
                     EOF

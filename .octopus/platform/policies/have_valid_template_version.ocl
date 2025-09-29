@@ -1,0 +1,25 @@
+name = "Require Valid Version of Attestation Verification" 
+description = "This Policy checks that an attestation verification step of at least version 1.0.0 is used" 
+ViolationReason = "Attestation verification template version 1.0.0 or higher is required to deploy"
+
+scope {
+    rego = <<-EOT
+        package have_valid_template_version
+        default evaluate := false
+        evaluate := true if { 
+            not input.Runbook
+        }
+    EOT
+} 
+ 
+conditions {
+    rego = <<-EOT
+        package have_valid_template_version
+        default result := {"allowed": false}
+
+        result := {"allowed": true} if {
+            input.Steps[0].Source.SlugOrId in ["deploy-process-verify-build-artifacts", "deploy-process-verify-build-artifacts-aws", "deploy-process-verify-build-artifacts-base"]
+            semver.compare(input.Steps[0].Source.Version, "1.0.0") >= 0
+        }
+    EOT
+}

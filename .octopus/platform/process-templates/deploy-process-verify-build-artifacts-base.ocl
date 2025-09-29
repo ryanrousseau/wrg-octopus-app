@@ -1,15 +1,15 @@
-name = "DSC - GitHub - Verify Build Artifacts - Docker"
+name = "Deploy Process - Verify Build Artifacts"
 description = <<-EOT
         This process template uses GitHub's CLI tooling to verify the attestations on packages that were built and published as part of your CI/CD pipeline.
         <br /><br />
-        This process will use `docker login` to authenticate to Docker Hub prior to the attestation check.
+        **Note** - if your process has any container image packages, you likely want to use one of our other templates that supports the container registry's authentication.
         <br /><br />
         See [this blog post](https://octopus.com/blog/supply-chain-security-with-github-and-octopus-deploy) for more information.
         EOT
 
 icon {
-    color = "#1D63ED"
-    id = "docker"
+    color = "#104C35"
+    id = "github"
 }
 
 parameter "Template.SBOM.Artifact" {
@@ -40,26 +40,8 @@ parameter "Template.Verify.ExecutionContainerFeed" {
     display_settings = {
         Octopus.ControlType = "Feed"
     }
-    help_text = "The `Docker Hub` feed to be used in which to pull the execution containers from."
+    help_text = "The `DockerHub` feed to be used in which to pull the execution containers from."
     label = "Verify Container Feed"
-}
-
-parameter "Template.Docker.Account" {
-    display_settings = {
-        Octopus.ControlType = "UsernamePasswordAccount"
-    }
-    help_text = "The `Docker` account to use to authenticate when pulling container images."
-    label = "Docker Account"
-}
-
-parameter "Template.Docker.Registry" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = ""
-    label = "Docker Registry"
-
-    value "docker.io" {}
 }
 
 step "verify-configuration" {
@@ -79,12 +61,18 @@ step "verify-configuration" {
                   )
 
                   if ([string]::IsNullOrWhiteSpace($value)) {
+                    Write-Verbose "Value is null or whitespace"
                     return $true
                   }
                 
-                  $matches = $value | Select-String -Pattern "#\{([^}]*)\}" -AllMatches
-                
-                  return $matches.Count -gt 0
+                  $results = $value | Select-String -Pattern "#\{([^}]*)\}" -AllMatches
+                  $hasMatches = $results -gt 0
+
+                  if ($hasMatches) {
+                    Write-Verbose "Value contains an unresolved variable"
+                  }
+
+                  return $hasMatches
                 }
                 
                 
@@ -102,14 +90,6 @@ step "verify-configuration" {
                 
                 if (Check-Parameter $OctopusParameters["Template.Verify.ExecutionContainerFeed"]) {
                   Fail-Step "Execution Container Feed is required."
-                }
-                
-                if (Check-Parameter $OctopusParameters["Template.Docker.Account"]) {
-                  Fail-Step "Docker Account is required."
-                }
-                
-                if (Check-Parameter $OctopusParameters["Template.Docker.Registry"]) {
-                  Fail-Step "Docker Registry is required."
                 }
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
@@ -171,7 +151,7 @@ step "attach-sbom-to-release" {
     }
 }
 
-step "run-attestation-verification-on-build-artifacts" {
+step "verify-build-artifacts" {
     name = "Run Attestation Verification on Build Artifacts"
     start_trigger = "StartWithPrevious"
 
@@ -183,13 +163,6 @@ step "run-attestation-verification-on-build-artifacts" {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $gitHubToken = $OctopusParameters["Template.Git.AuthToken"]
-                
-                $registry = $OctopusParameters["Template.Docker.Registry"]
-                $dockerUser = $OctopusParameters["Template.Docker.Account.Username"]
-                $dockerPassword = $OctopusParameters["Template.Docker.Account.Password"]
-                
-                Write-Host "Logging into DockerHub with user $dockerUser"
-                docker login $registry --username $dockerUser --password $dockerPassword
                 
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
@@ -259,43 +232,31 @@ step "run-attestation-verification-on-build-artifacts" {
                 {    
                   Write-Host "Verifying $packageItem"
                   $artifactToCompare = $packageItem.Trim().Split(':')
-                  $packageName = $artifactToCompare[0].Replace("/", "")
+                  $packageName = $artifactToCompare[0].Replace("/", ".")
                   
-                  if ($packageItem.Contains("/"))
-                  {
-                      $imageToAttest = "oci://$registry/$packageItem"
-                
-                      Write-Host "Attesting to $imageToAttest in the repo $githubLessUrl"
-                      $attestation=gh attestation verify "$imageToAttest" --repo $githubLessUrl --format json 
-                
-                      if ($LASTEXITCODE -ne 0)
-                      {
-                         Write-Error "The attestation for $packageItem could not be verified"
-                      }
-                
-                      Write-Highlight "$packageItem successfully passed attestation verification"
-                      Write-Verbose $attestation
-                
-                      Write-Host "Writing the attest output to $packageName.$OctopusEnvironmentName.attestation.json"
-                      New-Item -Name "$packageName.$OctopusEnvironmentName.attestation.json" -ItemType "File" -Value $attestation
-                      New-OctopusArtifact -Path "$packageName.$OctopusEnvironmentName.attestation.json" -Name  "$packageName.$OctopusEnvironmentName.attestation.json"
-                  }
-                  else
-                  {    
-                    if (Test-Path "/octopus/Files/")
+                  $escapedOne = $artifactToCompare[0] -Replace "/", "%2F"
+                  $escapedTwo = $artifactToCompare[1] -Replace "/", "%2F"
+                  Write-Host "The escaped values are $escapedOne and $escapedTwo"
+                  $filter = "*$($escapedOne)*$($escapedTwo)@*.zip"
+                  Write-Host "The filter to use is $filter"
+
+                  if (Test-Path "/octopus/Files/")
                     {
+                      ls -alR /octopus/Files/
                       Write-Host "$artifactToCompare is a package from our local repo, getting the information from /octopus/Files/"
-                      $zipFiles = Get-ChildItem -Path "/octopus/Files/" -Filter "*$($artifactToCompare[0])*$($artifactToCompare[1])@*.zip" -Recurse
+                      $zipFiles = Get-ChildItem -Path "/octopus/Files/" -Filter "$filter" -Recurse
                     }
                     else
                     {
+                      ls -alR /home/Octopus/Files
                       Write-Host "$artifactToCompare is a package from our local repo, getting the information from /home/Octopus/Files"
-                      $zipFiles = Get-ChildItem -Path "/home/Octopus/Files" -Filter "*$($artifactToCompare[0])*$($artifactToCompare[1])@*.zip" -Recurse
+                      $zipFiles = Get-ChildItem -Path "/home/Octopus/Files" -Filter "$filter" -Recurse
                     }
                 
                     $artifactVerified = $false
                     foreach ($file in $zipFiles) 
                     {
+                      Write-Host "Found a zip file to verify: $($file.FullName)"
                       if (test-path "$packageName.$OctopusEnvironmentName.attestation.json")
                       {
                         Continue
@@ -321,8 +282,7 @@ step "run-attestation-verification-on-build-artifacts" {
                     if ($artifactVerified -eq $false)
                     {
                       Write-Error "Unable to find a matching zip file for $packageItem to verify the attestation."
-                    }
-                  }  
+                    }  
                 }
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
