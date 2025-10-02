@@ -283,9 +283,6 @@ step "apply-terraform" {
                 
                 # Install PowerShell Core
                 choco install powershell-core -y
-
-                choco install gh -y
-                choco install trivy -y
                 
                     </powershell>
                     EOF
@@ -385,6 +382,8 @@ step "bootstrap-target" {
                 Remove-IISSite -Name "Default Web Site" -Confirm:$false
                 
                 choco install dotnet-aspnetcoremodule-v2 -y
+                choco install gh -y
+                choco install trivy -y
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
