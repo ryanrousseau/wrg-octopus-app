@@ -384,6 +384,10 @@ step "bootstrap-target" {
                 choco install dotnet-aspnetcoremodule-v2 -y
                 choco install gh -y
                 choco install trivy -y
+                
+                
+                
+                [Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable("Path", "User"));C:\Program Files\GitHub CLI", "User")
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
