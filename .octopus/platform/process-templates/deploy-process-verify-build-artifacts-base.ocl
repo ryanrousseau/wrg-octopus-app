@@ -417,7 +417,7 @@ step "run-attestation-verification-on-target-packages" {
                       }
                       
                       Write-Host "Attesting to $($file.FullName) in the repo $githubLessUrl"
-                      $attestation=gh attestation verify "$($file.FullName)" --repo $githubLessUrl --format json
+                      $attestation= & "gh" attestation verify "$($file.FullName)" --repo $githubLessUrl --format json
                 
                       if ($LASTEXITCODE -ne 0)
                       {
