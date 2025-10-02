@@ -20,6 +20,14 @@ parameter "Template.SBOM.Artifact" {
     label = "SBOM Package"
 }
 
+parameter "Template.Target.Tags" {
+    display_settings = {
+        Octopus.ControlType = "TargetTags"
+    }
+    help_text = ""
+    label = "Target Tags"
+}
+
 parameter "Template.Git.AuthToken" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
@@ -59,7 +67,7 @@ step "verify-configuration" {
                   param(
                     $value
                   )
-
+                
                   if ([string]::IsNullOrWhiteSpace($value)) {
                     Write-Verbose "Value is null or whitespace"
                     return $true
@@ -67,11 +75,11 @@ step "verify-configuration" {
                 
                   $results = $value | Select-String -Pattern "#\{([^}]*)\}" -AllMatches
                   $hasMatches = $results -gt 0
-
+                
                   if ($hasMatches) {
                     Write-Verbose "Value contains an unresolved variable"
                   }
-
+                
                   return $hasMatches
                 }
                 
@@ -152,10 +160,10 @@ step "attach-sbom-to-release" {
 }
 
 step "verify-build-artifacts" {
-    name = "Run Attestation Verification on Build Artifacts"
+    name = "Run Attestation Verification on Worker Packages"
     start_trigger = "StartWithPrevious"
 
-    action {
+    action "run-attestation-verification-on-worker-packages" {
         action_type = "Octopus.Script"
         is_required = true
         notes = "This step loops through the process's packages to verify their attestations using GitHub's CLI tooling."
@@ -239,7 +247,7 @@ step "verify-build-artifacts" {
                   Write-Host "The escaped values are $escapedOne and $escapedTwo"
                   $filter = "*$($escapedOne)*$($escapedTwo)@*.zip"
                   Write-Host "The filter to use is $filter"
-
+                
                   if (Test-Path "/octopus/Files/")
                     {
                       ls -alR /octopus/Files/
@@ -281,7 +289,7 @@ step "verify-build-artifacts" {
                 
                     if ($artifactVerified -eq $false)
                     {
-                      Write-Error "Unable to find a matching zip file for $packageItem to verify the attestation."
+                      Write-Warning "Unable to find a matching zip file for $packageItem to verify the attestation."
                     }  
                 }
                 EOT
@@ -295,5 +303,148 @@ step "verify-build-artifacts" {
             feed = "#{Template.Verify.ExecutionContainerFeed}"
             image = "octopuslabs/github-workertools:latest"
         }
+    }
+}
+
+step "run-attestation-verification-on-target-packages" {
+    name = "Run Attestation Verification on Target Packages"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Target.Tags}"
+    }
+    start_trigger = "StartWithPrevious"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $gitHubToken = $OctopusParameters["Template.Git.AuthToken"]
+                
+                $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
+                $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
+                
+                $objectArray = @()
+                foreach ($key in $OctopusParameters.Keys)
+                {
+                  if ($key -like "*.PackageId")
+                  {
+                    Write-Host "Found a package Id parameter: $key - checking to see if it already is in the packages to verify"
+                    
+                    $packageId = $OctopusParameters[$key]
+                    Write-Host "The package ID to check for is $packageId"
+                
+                    $packageVersionKey = $key -replace ".PackageId", ".PackageVersion"
+                    Write-Host "The package version key is $packageVersionKey"
+                    $packageVersion = $OctopusParameters[$packageVersionKey]
+                    Write-Host "The package version is $packageVersion"
+                
+                    $packageVersionToVerify = "$($packageId):$($packageVersion)"
+                
+                    if ($objectArray -contains "$packageVersionToVerify")
+                    {
+                      Write-Host "$packageVersionToVerify already exists in the array"
+                    }
+                    else
+                    {
+                      Write-Host "$packageVersionToVerify does not exist - adding it"
+                      $objectArray += $packageVersionToVerify
+                    }    
+                  }  
+                }
+                
+                $buildInfoObject = ConvertFrom-Json $buildInformation
+                $vcsRoot = $null
+                
+                Write-Host "Getting the repo name from build information"
+                foreach ($packageItem in $objectArray)
+                {
+                  $artifactToCompare = $packageItem.Trim().Split(':')
+                  $packageVersion = $artifactToCompare[1]
+                  
+                  Write-Host "The version to look for is: $packageVersion"
+                  
+                  foreach ($package in $buildInfoObject)
+                  {
+                    Write-Host "Comparing $($package.Version) with $($packageVersion)"
+                    if ($packageVersion -eq $package.Version)
+                    {
+                      Write-Host "Versions match, getting the build URL"    
+                      $vcsRoot = $package.VcsRoot
+                      Write-Host "The vcsRoot is $vcsRoot"    
+                    }
+                  }
+                }
+                
+                if ($null -eq $vcsRoot)
+                {
+                  Write-Error "Unable to pull the build information URL from the Octopus Build information using supplied versions in $packageName.  Check that the build information has been supplied and try again."
+                }
+                
+                $githubLessUrl = $vcsRoot -Replace "https://github.com/", ""
+                
+                $env:GITHUB_TOKEN = $gitHubToken
+                
+                foreach($packageItem in $objectArray)
+                {    
+                  Write-Host "Verifying $packageItem"
+                  $artifactToCompare = $packageItem.Trim().Split(':')
+                  $packageName = $artifactToCompare[0].Replace("/", ".")
+                  
+                  $escapedOne = $artifactToCompare[0] -Replace "/", "%2F"
+                  $escapedTwo = $artifactToCompare[1] -Replace "/", "%2F"
+                  Write-Host "The escaped values are $escapedOne and $escapedTwo"
+                  $filter = "*$($escapedOne)*$($escapedTwo)@*.zip"
+                  Write-Host "The filter to use is $filter"
+                
+                  if (Test-Path "/octopus/Files/")
+                    {
+                      ls -alR /octopus/Files/
+                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from /octopus/Files/"
+                      $zipFiles = Get-ChildItem -Path "/octopus/Files/" -Filter "$filter" -Recurse
+                    }
+                    else
+                    {
+                      ls -alR /home/Octopus/Files
+                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from /home/Octopus/Files"
+                      $zipFiles = Get-ChildItem -Path "/home/Octopus/Files" -Filter "$filter" -Recurse
+                    }
+                
+                    $artifactVerified = $false
+                    foreach ($file in $zipFiles) 
+                    {
+                      Write-Host "Found a zip file to verify: $($file.FullName)"
+                      if (test-path "$packageName.$OctopusEnvironmentName.attestation.json")
+                      {
+                        Continue
+                      }
+                      
+                      Write-Host "Attesting to $($file.FullName) in the repo $githubLessUrl"
+                      $attestation=gh attestation verify "$($file.FullName)" --repo $githubLessUrl --format json
+                
+                      if ($LASTEXITCODE -ne 0)
+                      {
+                         Write-Error "The attestation for $packageItem could not be verified"
+                      }
+                
+                      Write-Highlight "$packageItem successfully passed attestation verification"
+                      Write-Verbose $attestation
+                      $artifactVerified = $true
+                
+                      Write-Host "Writing the attest output to $packageName.$OctopusEnvironmentName.attestation.json"
+                      New-Item -Name "$packageName.$OctopusEnvironmentName.attestation.json" -ItemType "File" -Value $attestation
+                      New-OctopusArtifact -Path "$packageName.$OctopusEnvironmentName.attestation.json" -Name  "$packageName.$OctopusEnvironmentName.attestation.json"
+                    }
+                
+                    if ($artifactVerified -eq $false)
+                    {
+                      Write-Warning "Unable to find a matching zip file for $packageItem to verify the attestation."
+                    }  
+                }
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
     }
 }
