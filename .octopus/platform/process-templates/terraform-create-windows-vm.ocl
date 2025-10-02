@@ -385,9 +385,12 @@ step "bootstrap-target" {
                 choco install gh -y
                 choco install trivy -y
                 
+                $path = $env:PATH
                 
+                $path = "$path;C:\Program Files\GitHub CLI"
+                [Environment]::SetEnvironmentVariable("PATH", $path, "User")
                 
-                [Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable("Path", "User"));C:\Program Files\GitHub CLI", "User")
+                Write-Host $env:PATH
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
