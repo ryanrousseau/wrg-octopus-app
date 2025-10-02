@@ -396,17 +396,15 @@ step "run-attestation-verification-on-target-packages" {
                   $filter = "*$($escapedOne)*$($escapedTwo)@*.zip"
                   Write-Host "The filter to use is $filter"
                 
-                  if (Test-Path "/octopus/Files/")
+                  if (Test-Path "c:\octopus\Files\")
                     {
-                      ls -alR /octopus/Files/
-                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from /octopus/Files/"
-                      $zipFiles = Get-ChildItem -Path "/octopus/Files/" -Filter "$filter" -Recurse
+                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from c:\octopus\Files\"
+                      $zipFiles = Get-ChildItem -Path "c:\octopus\Files\" -Filter "$filter" -Recurse
                     }
                     else
                     {
-                      ls -alR /home/Octopus/Files
-                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from /home/Octopus/Files"
-                      $zipFiles = Get-ChildItem -Path "/home/Octopus/Files" -Filter "$filter" -Recurse
+                      Write-Host "$artifactToCompare is a package from our local repo, getting the information from c:\home\Octopus\Files\"
+                      $zipFiles = Get-ChildItem -Path "c:\home\Octopus\Files\" -Filter "$filter" -Recurse
                     }
                 
                     $artifactVerified = $false
