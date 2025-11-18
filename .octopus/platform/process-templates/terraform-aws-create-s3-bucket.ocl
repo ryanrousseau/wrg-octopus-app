@@ -119,6 +119,7 @@ step "plan-terraform-apply" {
                 resource "aws_s3_bucket" "my_bucket" {
                   bucket = "#{Template.AWS.Bucket.Name}"
                   acl    = "private"
+                  force_destroy = true
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
@@ -194,6 +195,7 @@ step "apply-terraform" {
                 resource "aws_s3_bucket" "my_bucket" {
                   bucket = "#{Template.AWS.Bucket.Name}"
                   acl    = "private"
+                  force_destroy = true
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
