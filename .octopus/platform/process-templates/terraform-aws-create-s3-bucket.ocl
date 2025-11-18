@@ -93,6 +93,7 @@ step "plan-terraform-apply" {
             Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
             Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
             Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Terraform.AllowPluginDownloads = "True"
             Octopus.Action.Terraform.AzureAccount = "False"
@@ -135,6 +136,11 @@ step "plan-terraform-apply" {
             Octopus.Action.Terraform.TemplateParameters = "{}"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
+
+        container {
+            feed = "#{Template.Worker.Container.Feed}"
+            image = "#{Template.Worker.Container.Image}"
+        }
     }
 }
 
