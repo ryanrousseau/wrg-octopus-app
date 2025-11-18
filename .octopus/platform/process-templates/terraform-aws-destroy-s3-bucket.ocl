@@ -74,12 +74,13 @@ parameter "Template.Environments.Production" {
     label = "Production environment(s)"
 }
 
-step "plan-terraform-apply" {
-    name = "Plan Terraform apply"
+step "plan-a-terraform-destroy" {
+    name = "Plan a Terraform destroy"
 
     action {
-        action_type = "Octopus.TerraformPlan"
+        action_type = "Octopus.TerraformPlanDestroy"
         properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
             Octopus.Action.AwsAccount.UseInstanceRole = "False"
             Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
@@ -119,6 +120,7 @@ step "plan-terraform-apply" {
                 resource "aws_s3_bucket" "my_bucket" {
                   bucket = "#{Template.AWS.Bucket.Name}"
                   acl    = "private"
+                  force_destroy = true
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
@@ -149,12 +151,13 @@ step "approve-plan" {
     }
 }
 
-step "apply-terraform" {
-    name = "Apply Terraform"
+step "destroy-terraform-resources" {
+    name = "Destroy Terraform resources"
 
     action {
-        action_type = "Octopus.TerraformApply"
+        action_type = "Octopus.TerraformDestroy"
         properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
             Octopus.Action.AwsAccount.UseInstanceRole = "False"
             Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
@@ -194,6 +197,7 @@ step "apply-terraform" {
                 resource "aws_s3_bucket" "my_bucket" {
                   bucket = "#{Template.AWS.Bucket.Name}"
                   acl    = "private"
+                  force_destroy = true
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
