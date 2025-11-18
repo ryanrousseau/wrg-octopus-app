@@ -1,36 +1,37 @@
-name = "Require Attestation Verification" 
-description = "This Policy checks that an attestation verification step isn't skipped" 
-ViolationReason = "Attestation verification step is required to deploy"
+name = "Require Attestation Verification"
+description = "This Policy checks that an attestation verification step isn't skipped"
+violation_reason = "Attestation verification step is required to deploy"
+
+conditions {
+    rego = <<-EOT
+                package check_for_attestation
+                default result := {"allowed": false}
+            
+                result := {"allowed": true} if {
+                    startswith(input.Steps[0].Source.SlugOrId, "deploy-process-verify-build-artifacts")
+                    input.Steps[0].Enabled == true
+                    not verify_build_artifacts_skipped
+                }
+            
+                result := {"allowed": false, "Reason": "The process template Deploy Process - Verify Build Artifacts is required and cannot be skipped for a deployment to K8s to any environment."} if {
+                    verify_build_artifacts_skipped
+                }
+            
+                verify_build_artifacts_skipped if {
+                    some step in input.Steps
+                    step.Id in input.SkippedSteps
+                    startswith(step.Source.SlugOrId, "deploy-process-verify-build-artifacts")
+                }
+            EOT
+}
 
 scope {
     rego = <<-EOT
-        package check_for_attestation
-        default evaluate := false
-        evaluate := true if { 
-            not input.Runbook
-        }
-    EOT
-} 
- 
-conditions {
-    rego = <<-EOT
-        package check_for_attestation
-        default result := {"allowed": false}
-
-        result := {"allowed": true} if {
-            startswith(input.Steps[0].Source.SlugOrId, "deploy-process-verify-build-artifacts")
-            input.Steps[0].Enabled == true
-            not verify_build_artifacts_skipped
-        }
-
-        result := {"allowed": false, "Reason": "The process template Deploy Process - Verify Build Artifacts is required and cannot be skipped for a deployment to K8s to any environment."} if {
-            verify_build_artifacts_skipped
-        }
-
-        verify_build_artifacts_skipped if {
-            some step in input.Steps
-            step.Id in input.SkippedSteps
-            startswith(step.Source.SlugOrId, "deploy-process-verify-build-artifacts")
-        }
-    EOT
+                package check_for_attestation
+                default evaluate := false
+                evaluate := true if { 
+                    startswith(input.ProjectGroup.Slug, "compliant-")
+                    not input.Runbook
+                }
+            EOT
 }
