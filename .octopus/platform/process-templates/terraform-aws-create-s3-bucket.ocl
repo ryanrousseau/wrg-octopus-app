@@ -65,14 +65,6 @@ parameter "Template.Worker.Container.Image" {
     value "octopusdeploy/worker-tools:ubuntu.22.04" {}
 }
 
-parameter "Template.Terraform.State.Bucket" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = ""
-    label = "Terraform State Bucket"
-}
-
 parameter "Template.Environments.Production" {
     display_settings = {
         Octopus.ControlType = "Environments"
@@ -113,9 +105,9 @@ step "plan-terraform-apply" {
                   }
                   
                   backend "s3" {
-                    bucket = "#{Template.Terraform.State.Bucket}"
+                    bucket = "demo-octopus-app-bucket"
                     key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
-                    region = "#{Template.AWS.Region.Code}"
+                    region = "us-west-2"
                   }
                 }
                 
@@ -188,9 +180,9 @@ step "apply-terraform" {
                   }
                   
                   backend "s3" {
-                    bucket = "#{Template.Terraform.State.Bucket}"
+                    bucket = "demo-octopus-app-bucket"
                     key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
-                    region = "#{Template.AWS.Region.Code}"
+                    region = "us-west-2"
                   }
                 }
                 
