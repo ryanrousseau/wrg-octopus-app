@@ -73,12 +73,82 @@ parameter "Template.Terraform.State.Bucket" {
     label = "Terraform State Bucket"
 }
 
-parameter "Template.Terraform.State.Key" {
+parameter "Template.Environments.Production" {
     display_settings = {
-        Octopus.ControlType = "SingleLineText"
+        Octopus.ControlType = "Environments"
     }
     help_text = ""
-    label = "Terraform State Key"
+    is_optional = true
+    label = "Production environment(s)"
+}
+
+step "plan-terraform-apply" {
+    name = "Plan Terraform apply"
+
+    action {
+        action_type = "Octopus.TerraformPlan"
+        properties = {
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region.Code}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "False"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "AWS"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                  required_version = ">=0.12"
+                  
+                  required_providers {
+                    aws = {
+                      source  = "hashicorp/aws"
+                      version = "~> 3.0"
+                    }
+                  }
+                  
+                  backend "s3" {
+                    bucket = "#{Template.Terraform.State.Bucket}"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    region = "#{Template.AWS.Region.Code}"
+                  }
+                }
+                
+                # Configure the AWS Provider
+                provider "aws" {
+                  region = "#{Template.AWS.Region.Code}"
+                }
+                
+                resource "aws_s3_bucket" "my_bucket" {
+                  bucket = "#{Template.AWS.Bucket.Name}"
+                  acl    = "private"
+                  tags = {
+                    Environment = "#{Octopus.Environment.Name}"
+                    Project     = "#{Octopus.Project.Name}"
+                  }
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{}"
+        }
+        worker_pool_variable = "#{Template.Worker.Pool}"
+    }
+}
+
+step "approve-plan" {
+    name = "Approve plan"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Environments.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Review the plan generated above."
+        }
+    }
 }
 
 step "apply-terraform" {
@@ -113,11 +183,11 @@ step "apply-terraform" {
                   
                   backend "s3" {
                     bucket = "#{Template.Terraform.State.Bucket}"
-                    key = "#{Template.Terraform.State.Key}"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
                     region = "#{Template.AWS.Region.Code}"
                   }
                 }
-
+                
                 # Configure the AWS Provider
                 provider "aws" {
                   region = "#{Template.AWS.Region.Code}"
@@ -132,6 +202,7 @@ step "apply-terraform" {
                   }
                 }
                 EOT
+            Octopus.Action.Terraform.TemplateParameters = "{}"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
 
