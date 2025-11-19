@@ -2,8 +2,8 @@ name = "Terraform - AWS - Destroy S3 Bucket"
 description = ""
 
 icon {
-    color = "#3CA4F3"
-    id = "linux"
+    color = "#927002"
+    id = "aws"
 }
 
 parameter "Template.AWS.Account" {

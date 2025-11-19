@@ -1,2 +1,222 @@
 name = "Terraform - AWS - Create Lambda"
 description = ""
+
+icon {
+    color = "#927002"
+    id = "aws"
+}
+
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+parameter "Template.Octopus.WorkerFeed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = "Execution Container Feed"
+}
+
+parameter "Template.Octopus.WorkerImage" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Execution Container Image"
+
+    value "octopusdeploy/worker-tools:ubuntu.22.04" {}
+}
+
+parameter "Template.AWS.Account" {
+    display_settings = {
+        Octopus.ControlType = "AmazonWebServicesAccount"
+    }
+    help_text = ""
+    label = "AWS Account"
+}
+
+parameter "Template.AWS.Region" {
+    display_settings = {
+        Octopus.ControlType = "Select"
+        Octopus.SelectOptions = <<-EOT
+            us-east-1|US East (N. Virginia)
+            us-west-1|US West (N. California)
+            us-west-2|US West (Oregon)
+            af-south-1|Africa (Cape Town)
+            eu-central-1|Europe (Frankfurt)
+            EOT
+    }
+    help_text = ""
+    label = "AWS Region"
+
+    value "us-west-2" {}
+}
+
+parameter "Template.AWS.Lambda.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Name"
+}
+
+parameter "Template.AWS.Lambda.Role" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Role"
+}
+
+parameter "Template.Environments.Production" {
+    display_settings = {
+        Octopus.ControlType = "Environments"
+    }
+    help_text = ""
+    is_optional = true
+    label = "Production environment(s)"
+}
+
+step "plan-terraform-apply" {
+    name = "Plan Terraform apply"
+
+    action {
+        action_type = "Octopus.TerraformPlan"
+        properties = {
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "False"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "AWS"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                  required_version = ">=0.12"
+                  
+                  required_providers {
+                    aws = {
+                      source  = "hashicorp/aws"
+                      version = "~> 3.0"
+                    }
+                  }
+                  
+                  backend "s3" {
+                    bucket = "demo-octopus-app-bucket"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    region = "us-west-2"
+                  }
+                }
+                
+                # Configure the AWS Provider
+                provider "aws" {
+                  region = "#{Template.AWS.Region}"
+                }
+                
+                resource "aws_s3_bucket" "my_bucket" {
+                  bucket = "#{Template.AWS.Bucket.Name}"
+                  acl    = "private"
+                  force_destroy = true
+                  tags = {
+                    Environment = "#{Octopus.Environment.Name}"
+                    Project     = "#{Octopus.Project.Name}"
+                  }
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{}"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "approve-plan" {
+    name = "Approve plan"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Environments.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Review the plan generated above."
+        }
+    }
+}
+
+step "apply-terraform" {
+    name = "Apply Terraform"
+
+    action {
+        action_type = "Octopus.TerraformApply"
+        properties = {
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "False"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "AWS"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                  required_version = ">=0.12"
+                  
+                  required_providers {
+                    aws = {
+                      source  = "hashicorp/aws"
+                      version = "~> 3.0"
+                    }
+                  }
+                  
+                  backend "s3" {
+                    bucket = "demo-octopus-app-bucket"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    region = "us-west-2"
+                  }
+                }
+                
+                # Configure the AWS Provider
+                provider "aws" {
+                  region = "#{Template.AWS.Region.Code}"
+                }
+                
+                resource "aws_s3_bucket" "my_bucket" {
+                  bucket = "#{Template.AWS.Bucket.Name}"
+                  acl    = "private"
+                  force_destroy = true
+                  tags = {
+                    Environment = "#{Octopus.Environment.Name}"
+                    Project     = "#{Octopus.Project.Name}"
+                  }
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{}"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
