@@ -124,10 +124,17 @@ step "plan-terraform-apply" {
                   region = "#{Template.AWS.Region}"
                 }
                 
-                resource "aws_s3_bucket" "my_bucket" {
-                  bucket = "#{Template.AWS.Bucket.Name}"
-                  acl    = "private"
-                  force_destroy = true
+                resource "aws_lambda_function" "main" {
+                  function_name    = "#{Template.Lambda.Name}"
+                  role             = "#{Template.Lambda.Role}"
+                
+                  environment {
+                    variables = {
+                      ENVIRONMENT = "#{Octopus.Environment.Name}"
+                      LOG_LEVEL   = "info"
+                    }
+                  }
+                
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
@@ -197,13 +204,20 @@ step "apply-terraform" {
                 
                 # Configure the AWS Provider
                 provider "aws" {
-                  region = "#{Template.AWS.Region.Code}"
+                  region = "#{Template.AWS.Region}"
                 }
                 
-                resource "aws_s3_bucket" "my_bucket" {
-                  bucket = "#{Template.AWS.Bucket.Name}"
-                  acl    = "private"
-                  force_destroy = true
+                resource "aws_lambda_function" "main" {
+                  function_name    = "#{Template.Lambda.Name}"
+                  role             = "#{Template.Lambda.Role}"
+                
+                  environment {
+                    variables = {
+                      ENVIRONMENT = "#{Octopus.Environment.Name}"
+                      LOG_LEVEL   = "info"
+                    }
+                  }
+                
                   tags = {
                     Environment = "#{Octopus.Environment.Name}"
                     Project     = "#{Octopus.Project.Name}"
