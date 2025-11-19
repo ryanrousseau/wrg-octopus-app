@@ -1,4 +1,4 @@
-name = "Kubernetes - Blue-Green"
+name = "Deploy Process - Kubernetes - Blue-Green"
 description = ""
 
 icon {
