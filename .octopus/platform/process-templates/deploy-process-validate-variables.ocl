@@ -1,2 +1,172 @@
 name = "Deploy Process - Validate Variables"
 description = ""
+
+icon {
+    color = "#757575"
+    id = "banjo"
+}
+
+parameter "Template.Octopus.ApiKey" {
+    display_settings = {
+        Octopus.ControlType = "Sensitive"
+    }
+    label = "Octopus API Key"
+}
+
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+step "check-for-missing-environment-variable-values" {
+    name = "Check for missing Environment variable values"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                # Make these step template variables
+                $octopusApiKey = $OctopusParameters["Template.Octopus.ApiKey"]
+                
+                # Declare working variables
+                $octopusServerUri = $null
+                $releaseNumber = $OctopusParameters['Octopus.Release.Number']
+                $deploymentId = $OctopusParameters['Octopus.Deployment.Id']
+                $spaceId = $OctopusParameters['Octopus.Space.Id']
+                $projectId = $OctopusParameters['Octopus.Project.Id']
+                $environmentId = $OctopusParameters['Octopus.Environment.Id']
+                
+                #Functions
+                function Get-OctopusItems
+                {
+                	# Define parameters
+                    param(
+                    	$OctopusUri,
+                        $ApiKey,
+                        $SkipCount = 0
+                    )
+                    
+                    # Define working variables
+                    $items = @()
+                    $skipQueryString = ""
+                    $headers = @{"X-Octopus-ApiKey"="$ApiKey"}
+                
+                    # Check to see if there there is already a querystring
+                    if ($octopusUri.Contains("?"))
+                    {
+                        $skipQueryString = "&skip="
+                    }
+                    else
+                    {
+                        $skipQueryString = "?skip="
+                    }
+                
+                    $skipQueryString += $SkipCount
+                    
+                    # Get intial set
+                    $resultSet = Invoke-RestMethod -Uri "$($OctopusUri)$skipQueryString" -Method GET -Headers $headers
+                
+                    # Check to see if it returned an item collection
+                    if ($null -ne $resultSet.Items)
+                    {
+                        # Store call results
+                        $items += $resultSet.Items
+                    
+                        # Check to see if resultset is bigger than page amount
+                        if (($resultSet.Items.Count -gt 0) -and ($resultSet.Items.Count -eq $resultSet.ItemsPerPage))
+                        {
+                            # Increment skip count
+                            $SkipCount += $resultSet.ItemsPerPage
+                
+                            # Recurse
+                            $items += Get-OctopusItems -OctopusUri $OctopusUri -ApiKey $ApiKey -SkipCount $SkipCount
+                        }
+                    }
+                    else
+                    {
+                        return $resultSet
+                    }
+                    
+                
+                    # Return results
+                    return $items
+                }
+                
+                # Fix ANSI Color on PWSH Core issues when displaying objects
+                if ($PSEdition -eq "Core") {
+                    $PSStyle.OutputRendering = "PlainText"
+                }
+                
+                # Get the server uri
+                if ([string]::IsNullOrWhitespace($OctopusParameters['Octopus.Web.ServerUri']))
+                {
+                  $octopusServerUri = $OctopusParameters['Octopus.Web.BaseUrl']
+                }
+                else
+                {
+                  $octopusServerUri = $OctopusParameters['Octopus.Web.ServerUri']
+                }
+                
+                # Get Environment list
+                $environmentCollection = Get-OctopusItems -OctopusUri "$octopusServerUri/api/$spaceId/Environments" -ApiKey $octopusApiKey
+                
+                # Get Release variable snapshot
+                $release = Get-OctopusItems -OctopusUri "$octopusServerUri/api/$spaceId/projects/$projectId/releases/$releaseNumber" -ApiKey $octopusApiKey
+                $releaseVariableSnapshot = Get-OctopusItems -OctopusUri "$octopusServerUri$($release.Links.ProjectVariableSnapshot)" -ApiKey $octopusApiKey
+                
+                # Get unique variable names
+                $uniqueVariableNames = $releaseVariableSnapshot.Variables | Select-Object -Property Name -Unique
+                
+                # Iterate through variables
+                foreach ($variableName in $uniqueVariableNames.Name)
+                {
+                  # Grab the variable collection matching on name
+                  $snapshotVariable = ($releaseVariableSnapshot.Variables | Where-Object {$_.Name -eq $variableName})
+                
+                  $clonedEnvironments = $environmentCollection.Clone()
+                
+                  $scopedToEnvironment = $false
+                  $hasScoping = $false
+                  foreach ($variable in $snapshotVariable)
+                  {
+                    if ($null -ne $variable.Scope.Environment)
+                    {
+                      $hasScoping = $true
+                      foreach ($environmentScope in $variable.Scope.Environment)
+                      {
+                        $clonedEnvironments = ($clonedEnvironments | Where-Object {$_.Id -ne $environmentScope})
+                        if ($environmentScope -eq $environmentId)
+                        {
+                          $scopedToEnvironment = $true
+                        }
+                      }
+                    }
+                  }
+                
+                  if ($hasScoping -eq $false)
+                  {
+                    Write-Warning "Variable $variableName is not scoped to any Environments."
+                  }
+                  else
+                  {
+                    foreach ($environment in $clonedEnvironments)
+                    {
+                      Write-Warning "Variable $variableName does not have a scoping to $($environment.Name)"
+                    }
+                    if ($scopedToEnvironment -eq $false)
+                    {
+                      Write-Error "Variable $variableName does not have a scoping for #{Octopus.Environment.Name}!"
+                    }
+                  }
+                }
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
