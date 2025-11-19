@@ -1099,7 +1099,7 @@ step "test-inactive-app-url" {
         properties = {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $url = $OctopusParameters["#{Octopus.ProcessTemplate.Action[Get inactive app url].Output.Url}"]
+                $url = $OctopusParameters["Octopus.ProcessTemplate.Action[Get inactive app url].Output.Url"]
                 
                 Write-Host "Testing $url"
                 
