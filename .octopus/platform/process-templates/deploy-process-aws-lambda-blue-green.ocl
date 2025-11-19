@@ -766,7 +766,6 @@ step "set-inactive-alias-to-new-version-for-testing" {
 
     action {
         action_type = "Octopus.AwsRunScript"
-        is_disabled = true
         properties = {
             AWS.Lambda.Account = "Template.AWS.Account"
             AWS.Lambda.Alias.FunctionVersion = "#{Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion}"
@@ -1056,6 +1055,7 @@ step "create-inactive-alias" {
 
     action {
         action_type = "Octopus.AwsRunScript"
+        is_disabled = true
         properties = {
             Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
@@ -1069,7 +1069,7 @@ step "create-inactive-alias" {
                 
                 $inactive = $(aws lambda get-alias --function-name $name --name inactive)
                 
-                if ($inactive -ne $null) {
+                if ($inactive -eq $null) {
                   aws lambda create-alias --function-name $name --description "alias for live version of function" --function-version $version --name inactive
                 }
                 
