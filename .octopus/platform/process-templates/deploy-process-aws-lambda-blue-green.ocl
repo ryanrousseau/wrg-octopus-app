@@ -766,6 +766,7 @@ step "set-inactive-alias-to-new-version-for-testing" {
 
     action {
         action_type = "Octopus.AwsRunScript"
+        is_disabled = true
         properties = {
             AWS.Lambda.Account = "Template.AWS.Account"
             AWS.Lambda.Alias.FunctionVersion = "#{Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion}"
@@ -1042,6 +1043,40 @@ step "set-inactive-alias-to-new-version-for-testing" {
                 default_value = ""
             }
         }
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "create-inactive-alias" {
+    name = "Create inactive alias"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $version = $OctopusParameters["Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion"]
+                $name = $OctopusParameters["Template.Lambda.Name"]
+                
+                & aws lambda create-alias `
+                  --function-name $name `
+                  --description "alias for live version of function" `
+                  --function-version $version `
+                  --name active
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
 
         container {
             feed = "#{Template.Octopus.WorkerFeed}"
