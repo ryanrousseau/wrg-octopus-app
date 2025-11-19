@@ -1069,7 +1069,6 @@ step "create-inactive-alias" {
                 $version = $OctopusParameters["Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion"]
                 $name = $OctopusParameters["Template.Lambda.Name"]
                 
-                
                 $response = $(aws lambda get-function-url-config --function-name $name --qualifier inactive --output json)
                 
                 if ($response -eq $null) {
@@ -1079,8 +1078,6 @@ step "create-inactive-alias" {
                 }
                 
                 $response = $response | ConvertFrom-Json -Depth 10
-                
-                write-host $response
                 
                 Set-OctopusVariable -Name "Url" -Value $response.FunctionUrl
                 EOT
