@@ -1072,9 +1072,9 @@ step "create-inactive-alias" {
                   $response = $(aws lambda create-function-url-config --function-name $name --qualifier inactive --auth-type NONE --output json) | Convert-FromJson -Depth 10
                 }
                 
-                write-host $response.FunctionUrl
+                write-host $response
                 
-                Set-OctopusVariable -Name "Url" -Value $result.FunctionUrl
+                Set-OctopusVariable -Name "Url" -Value $response.FunctionUrl
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
