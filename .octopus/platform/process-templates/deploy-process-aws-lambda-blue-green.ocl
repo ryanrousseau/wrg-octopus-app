@@ -1051,11 +1051,10 @@ step "set-inactive-alias-to-new-version-for-testing" {
 }
 
 step "create-inactive-alias" {
-    name = "Create inactive alias"
+    name = "Create inactive alias url"
 
-    action {
+    action "create-inactive-alias-url" {
         action_type = "Octopus.AwsRunScript"
-        is_disabled = true
         properties = {
             Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
@@ -1069,10 +1068,9 @@ step "create-inactive-alias" {
                 
                 $inactive = $(aws lambda get-alias --function-name $name --name inactive)
                 
-                if ($inactive -eq $null) {
-                  aws lambda create-alias --function-name $name --description "alias for live version of function" --function-version $version --name inactive
-                }
+                $response = $(aws lambda create-function-url-config --function-name $name --qualifier inactive --auth-type NONE --output json)
                 
+                write-host $response
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
