@@ -1,2 +1,1703 @@
 name = "Deploy Process - AWS Lambda - Blue-Green"
 description = ""
+
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+parameter "Template.Octopus.WorkerFeed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = "Container Feed"
+}
+
+parameter "Template.Octopus.WorkerImage" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Worker Image"
+
+    value "octopusdeploy/worker-tools:6.4.0-ubuntu.22.04" {}
+}
+
+parameter "Template.AWS.Account" {
+    display_settings = {
+        Octopus.ControlType = "AmazonWebServicesAccount"
+    }
+    help_text = ""
+    label = "AWS Account"
+}
+
+parameter "Template.AWS.Region" {
+    display_settings = {
+        Octopus.ControlType = "Select"
+        Octopus.SelectOptions = <<-EOT
+            us-east-1|US East (N. Virginia)
+            us-west-1|US West (N. California)
+            us-west-2|US West (Oregon)
+            af-south-1|Africa (Cape Town)
+            eu-central-1|Europe (Frankfurt)
+            EOT
+    }
+    help_text = ""
+    label = "AWS Region"
+
+    value "us-west-2" {}
+}
+
+parameter "Template.Lambda.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Name"
+}
+
+parameter "Template.Package" {
+    display_settings = {
+        Octopus.ControlType = "Package"
+    }
+    help_text = ""
+    label = "Lambda Image Package"
+}
+
+parameter "Template.Lambda.FunctionRole" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Function Role"
+}
+
+parameter "Template.Lambda.Url.Inactive" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Inactive Url"
+}
+
+parameter "Template.Lambda.Url.Active" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Active Url"
+}
+
+parameter "Template.Environments.Production" {
+    display_settings = {
+        Octopus.ControlType = "Environments"
+    }
+    help_text = ""
+    label = "Production Environment(s)"
+}
+
+step "get-active-version" {
+    name = "Get active version"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                functionName=$(get_octopusvariable "Template.Lambda.Name")  
+                
+                result=$(aws lambda get-alias --function-name $functionName --name active | jq '.FunctionVersion')
+                
+                echo "The active version is $result"
+                
+                set_octopusvariable "ActiveVersion" $result
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "deploy-app" {
+    name = "Deploy app"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            AWS.Lambda.Account = "Template.AWS.Account"
+            AWS.Lambda.EnvironmentVariables = "RELEASE=#{Octopus.Release.Number},IMAGE=#{Octopus.Action.Package[AWS.Lambda.Package].Image},ENVIRONMENT=#{Octopus.Environment.Name},APPLICATION_NAME=#{Octopus.Project.Name},OPEN_FEATURE_CLIENT_ID=#{Octopus.FeatureToggles.ClientIdentifier}"
+            AWS.Lambda.FunctionName = "#{Template.Lambda.Name}"
+            AWS.Lambda.FunctionRole = "#{Template.Lambda.FunctionRole}"
+            AWS.Lambda.FunctionTimeout = "15"
+            AWS.Lambda.MemorySize = "128"
+            AWS.Lambda.Package = "Template.Package"
+            AWS.Lambda.Publish = "Yes"
+            AWS.Lambda.Region = "#{Template.AWS.Region}"
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{AWS.Lambda.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{AWS.Lambda.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Stop";
+                
+                $functionName = $OctopusParameters["AWS.Lambda.FunctionName"] 
+                $functionRole = $OctopusParameters["AWS.Lambda.FunctionRole"]
+                $functionRunTime = $OctopusParameters["AWS.Lambda.Runtime"]
+                $functionMemorySize = $OctopusParameters["AWS.Lambda.MemorySize"]
+                $functionDescription = $OctopusParameters["AWS.Lambda.Description"]
+                $functionVPCSubnetId = $OctopusParameters["AWS.Lambda.VPCSubnetIds"]
+                $functionVPCSecurityGroupId = $OctopusParameters["AWS.Lambda.VPCSecurityGroupIds"]
+                $functionEnvironmentVariables = $OctopusParameters["AWS.Lambda.EnvironmentVariables"]
+                $functionEnvironmentVariablesKey = $OctopusParameters["AWS.Lambda.EnvironmentVariablesKey"]
+                $functionTimeout = $OctopusParameters["AWS.Lambda.FunctionTimeout"]
+                $functionTags = $OctopusParameters["AWS.Lambda.Tags"]
+                $functionFileSystemConfig = $OctopusParameters["AWS.Lambda.FileSystemConfig"]
+                $functionDeadLetterConfig = $OctopusParameters["AWS.Lambda.DeadLetterConfig"]
+                $functionTracingConfig = $OctopusParameters["AWS.Lambda.TracingConfig"]
+                $functionVersionNumber = $OctopusParameters["Octopus.Action.Package[AWS.Lambda.Package].PackageVersion"]
+                $functionPublishOption = $OctopusParameters["AWS.Lambda.Publish"]
+                
+                $functionReleaseNumber = $OctopusParameters["Octopus.Release.Number"]
+                $functionRunbookRun = $OctopusParameters["Octopus.RunbookRun.Id"]
+                $stepName = $OctopusParameters["Octopus.Step.Name"]
+                
+                $regionName = $OctopusParameters["AWS.Lambda.Region"]
+                
+                if ($null -ne $OctopusParameters["Octopus.Action.Package[AWS.Lambda.Package].Image"]) {
+                    $imageUri = $OctopusParameters["Octopus.Action.Package[AWS.Lambda.Package].Image"]
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionName)) {
+                    Write-Error "The parameter Function Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionRole)) {
+                    Write-Error "The parameter Role is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionReleaseNumber) -eq $false) {
+                    $deployVersionTag = "Octopus-Release=$functionReleaseNumber"
+                }
+                else {
+                    $deployVersionTag = "Octopus-Runbook-Run=$functionRunbookRun"
+                }
+                
+                Write-Host "Function Name: $functionName"
+                Write-Host "Function Role: $functionRole"
+                Write-Host "Function Memory Size: $functionMemorySize"
+                Write-Host "Function Description: $functionDescription"
+                Write-Host "Function Subnet Ids: $functionVPCSubnetId"
+                Write-Host "Function Security Group Ids: $functionVPCSecurityGroupId"
+                Write-Host "Function Timeout: $functionTimeout"
+                Write-Host "Function Tags: $functionTags"
+                Write-Host "Function File System Config: $functionFileSystemConfig"
+                Write-Host "Function Dead Letter Config: $functionDeadLetterConfig"
+                Write-Host "Function Tracing Config: $functionTracingConfig"
+                Write-Host "Function Publish: $functionPublishOption"
+                Write-Host "Function Image URI: $imageUri"
+                Write-Host "Function Environment Variables: $functionEnvironmentVariables"
+                Write-Host "Function Environment Variables Key: $functionEnvironmentVariablesKey"
+                
+                if (![string]::IsNullOrWhitespace($OctopusParameters["AWS.Lambda.Image.Entrypoint"]))
+                {
+                  Write-Host "Image Entrypoint override: $($OctopusParameters["AWS.Lambda.Image.Entrypoint"])"
+                }
+                
+                if (![string]::IsNullOrWhitespace($OctopusParameters["AWS.Lambda.Image.Command"]))
+                {
+                  Write-Host "Image Command override: $($OctopusParameters["AWS.Lambda.Image.Command"])"
+                }
+                
+                
+                Write-Host "Attempting to find the function $functionName in the region $regionName"
+                $hasExistingFunction = $true
+                
+                try {
+                    $existingFunction = aws lambda get-function --function-name "$functionName" 2> $null
+                    
+                    Write-Host "The exit code from the lookup was $LASTEXITCODE"
+                    if ($LASTEXITCODE -eq 255 -or $LASTEXITCODE -eq 254) {
+                        $hasExistingFunction = $false
+                    }   
+                    
+                    $existingFunction = $existingFunction | ConvertFrom-Json
+                }
+                catch {
+                    Write-Host "The function was not found"
+                    $hasExistingFunction = $false
+                }
+                
+                Write-Host "Existing functions: $hasExistingFunction"
+                Write-Host $existingFunction
+                
+                # Init argument variable
+                $lambdaArguments = @("lambda")
+                $waitArguments = @("lambda", "wait")
+                
+                if ($hasExistingFunction -eq $false) {
+                    Write-Highlight "Creating $functionName in $regionName"
+                
+                    $waitArguments += @("function-active-v2")
+                
+                    $lambdaArguments += @("create-function", "--role", $functionRole, "--memory-size", $functionMemorySize)
+                
+                    if ($null -ne $imageUri) {
+                        Write-Host "Deploying Lambda container ..."
+                        $lambdaArguments += @("--code", "ImageUri=$imageUri", "--package-type", "Image")
+                      
+                        if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Entrypoint']) -or ![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Command'])) {
+                            $lambdaArguments += "--image-config"
+                        
+                            if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Entrypoint'])) {
+                                $lambdaArguments += "EntryPoint=$($OctopusParameters['AWS.Lambda.Image.Entrypoint'])"
+                            }
+                
+                            if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Command'])) {
+                                $lambdaArguments += "Command=$($OctopusParameters['AWS.Lambda.Image.Command'])"
+                            }
+                        }
+                    }
+                }
+                else {
+                    Write-Highlight "Updating the $functionName code"
+                
+                    $waitArguments += @("function-updated")
+                    $lambdaArguments += "update-function-code"
+                
+                    if ($null -ne $imageUri) {
+                        Write-Host "Deploying Lambda container ..."
+                        $lambdaArguments += @("--image-uri", $imageUri)
+                    }
+                }
+                
+                $waitArguments += @("--function-name", "$functionName")
+                
+                $lambdaArguments += @("--function-name", "$functionName")
+                
+                # Wait for function to be done creating
+                Write-Host "Running aws $lambdaArguments ..."
+                $functionInformation = (aws $lambdaArguments)
+                (aws $waitArguments)
+                
+                
+                if ($hasExistingFunction -eq $true) {
+                    # update configuration
+                    $lambdaArguments = @("lambda", "update-function-configuration", "--function-name", "$functionName", "--role", $functionRole, "--memory-size", $functionMemorySize)
+                       
+                    if ($null -ne $imageUri) {
+                        Write-Highlight "Updating the $functionName image configuration"
+                        if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Entrypoint']) -or ![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Command'])) {
+                            $lambdaArguments += "--image-config"
+                        
+                            if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Entrypoint'])) {
+                                $lambdaArguments += "EntryPoint=$($OctopusParameters['AWS.Lambda.Image.Entrypoint'])"
+                            }
+                
+                            if (![string]::IsNullOrWhitespace($OctopusParameters['AWS.Lambda.Image.Command'])) {
+                                $lambdaArguments += "Command=$($OctopusParameters['AWS.Lambda.Image.Command'])"
+                            }
+                        }
+                    }
+                    
+                    $functionInformation = (aws $lambdaArguments)
+                    Write-Highlight "Waiting for configuration update to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                $functionInformation = $functionInformation | ConvertFrom-JSON
+                $functionArn = $functionInformation.FunctionArn
+                
+                Write-Host "Function ARN: $functionArn"
+                
+                if ([string]::IsNullOrWhiteSpace($functionEnvironmentVariables) -eq $false) {
+                    Write-Highlight "Environment variables specified, updating environment variables configuration for $functionName"
+                    $environmentVariables = "Variables={$functionEnvironmentVariables}"
+                    
+                    if ([string]::IsNullOrWhiteSpace($functionEnvironmentVariablesKey) -eq $true) {
+                        $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --environment "$environmentVariables"
+                    }
+                    else {
+                        $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --environment "$environmentVariables" --kms-key-arn "$functionEnvironmentVariablesKey"
+                    }
+                    
+                    Write-Highlight "Waiting for environment variable update to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionTimeout) -eq $false) {
+                    Write-Highlight "Timeout specified, updating timeout configuration for $functionName"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --timeout "$functionTimeout"
+                    
+                    Write-Highlight "Waiting for timeout upate to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionTags) -eq $false) {
+                    Write-Highlight "Tags specified, updating tags configuration for $functionName"
+                    $updatedConfig = aws lambda tag-resource --resource "$functionArn" --tags "$functionTags"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($deployVersionTag) -eq $false) {
+                    Write-Highlight "Deploy version tag found with value of $deployVersionTag, updating tags configuration for $functionName"
+                    aws lambda untag-resource --resource "$functionArn" --tag-keys "Octopus-Release" "Octopus-Runbook-Run"
+                    $updatedConfig = aws lambda tag-resource --resource "$functionArn" --tags "$deployVersionTag"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionVPCSubnetId) -eq $false -and [string]::IsNullOrWhiteSpace($functionVPCSecurityGroupId) -eq $false) {
+                    Write-Highlight "VPC subnets and security group specified, updating vpc configuration for $functionName"
+                    $vpcConfig = "SubnetIds=$functionVPCSubnetId,SecurityGroupIds=$functionVPCSecurityGroupId"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --vpc-config "$vpcConfig"
+                    
+                    Write-Highlight "Waiting for vpc configuration to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionDescription) -eq $false) {
+                    Write-Highlight "Description specified, updating description configuration for $functionName"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --description "$functionDescription"
+                    
+                    Write-Highlight "Waiting for description configuration ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionFileSystemConfig) -eq $false) {
+                    Write-Highlight "File System Config specified, updating file system configuration for $functionName"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --file-system-configs "$functionFileSystemConfig"	
+                    
+                    Write-Highlight "Wating for file system configuration update to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionDeadLetterConfig) -eq $false) {
+                    Write-Highlight "Dead Letter specified, updating dead letter configuration for $functionName"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --dead-letter-config "$functionDeadLetterConfig"	
+                    
+                    Write-Highlight "Waitng for Dead Letter configuration update to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionTracingConfig) -eq $false) {
+                    Write-Highlight "Tracing config specified, updating tracing configuration for $functionName"
+                    $updatedConfig = aws lambda update-function-configuration --function-name "$functionArn" --tracing-config "$functionTracingConfig"	
+                    
+                    Write-Highlight "Waiting for tracing configuration to complete ..."
+                    aws lambda wait function-updated --function-name "$functionName"
+                }
+                
+                Write-Host $updatedConfig | ConvertFrom-JSON
+                
+                if ($functionPublishOption -eq "Yes") {
+                    Write-Highlight "Publishing the function with the description $functionVersionNumber to create a snapshot of the current code and configuration of this function in AWS."
+                    $publishedVersion = aws lambda publish-version --function-name "$functionArn" --description "$functionVersionNumber"
+                    
+                    $publishedVersion = $publishedVersion | ConvertFrom-JSON
+                    
+                    Write-Highlight "Setting the output variable 'Octopus.Action[$($stepName)].Output.PublishedVersion' to $($publishedVersion.Version)"
+                    Set-OctopusVariable -name "PublishedVersion" -value "$($publishedVersion.Version)"    
+                }
+                
+                Write-Highlight "Setting the output variable 'Octopus.Action[$($stepName)].Output.LambdaArn' to $functionArn"
+                Set-OctopusVariable -name "LambdaArn" -value "$functionArn"
+                
+                Write-Highlight "AWS Lambda $functionName successfully deployed."
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        community_action_template_snapshot {
+            id = "CommunityActionTemplates-49"
+            version = 1
+
+            parameter "AWS.Lambda.FunctionName" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The name of the function to create or update.  See [documentation](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/lambda/create-function.html#options)
+                        
+                        Examples:
+                        - Function name - my-function .
+                        - Function ARN - arn:aws:lambda:us-west-2:123456789012:function:my-function .
+                        - Partial ARN - 123456789012:function:my-function .
+                        
+                        The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.
+                        
+                        EOT
+                label = "Function Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Account" {
+                display_settings = {
+                    Octopus.ControlType = "AmazonWebServicesAccount"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The AWS Account with permissions to create / update AWS Lambdas.
+                        
+                        EOT
+                label = "AWS Account"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Region" {
+                display_settings = {
+                    Octopus.ControlType = "Select"
+                    Octopus.SelectOptions = <<-EOT
+                        us-east-2|US East (Ohio)
+                        us-east-1|US East (N. Virginia)
+                        us-west-1|US West (N. California)
+                        us-west-2|US West (Oregon)
+                        af-south-1|Africa (Cape Town)
+                        ap-east-1|Asia Pacific (Hong Kong)
+                        ap-south-1|Asia Pacific (Mumbai)
+                        ap-northeast-3|Asia Pacific (Osaka-Local)
+                        ap-northeast-2|Asia Pacific (Seoul)
+                        ap-southeast-1|Asia Pacific (Singapore)
+                        ap-southeast-2|Asia Pacific (Sydney)
+                        ap-northeast-1|Asia Pacific (Tokyo)
+                        ca-central-1|Canada (Central)
+                        eu-central-1|Europe (Frankfurt)
+                        eu-west-1|Europe (Ireland)
+                        eu-west-2|Europe (London)
+                        eu-south-1|Europe (Milan)
+                        eu-west-3|Europe (Paris)
+                        eu-north-1|Europe (Stockholm)
+                        me-south-1|Middle East (Bahrain)
+                        sa-east-1|South America (São Paulo)
+                        EOT
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The region where the function will live.
+                        EOT
+                label = "Region"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Package" {
+                display_settings = {
+                    Octopus.ControlType = "Package"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The registry containing the image you wish to deploy to the AWS Lambda function.
+                        EOT
+                label = "Image"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.FunctionRole" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The Amazon Resource Name (ARN) of the function’s execution role.  This role must exist prior to this step is run.  See [documentation](https://docs.aws.amazon.com/lambda/latest/dg/lambda-intro-execution-role.html) for more detail on creating an execution role.
+                        EOT
+                label = "Function Role"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.MemorySize" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The amount of memory that your function has access to. Increasing the function’s memory also increases its CPU allocation. The default value is 128 MB. The value must be a multiple of 64 MB.
+                        EOT
+                label = "Memory Size"
+                default_value = "128"
+            }
+
+            parameter "AWS.Lambda.Description" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        A description of the function.
+                        EOT
+                label = "Description"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.VPCSubnetIds" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `SubnetId1,SubnetId2`
+                        
+                        For network connectivity to AWS resources in a VPC, specify a list of security groups and subnets in the VPC. When you connect a function to a VPC, it can only access resources and the internet through that VPC. For more information, see [VPC Settings](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html).
+                        EOT
+                label = "VPC Subnet Ids"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.VPCSecurityGroupIds" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `SecurityGroupId1,SecurityGroupId2`
+                        
+                        For network connectivity to AWS resources in a VPC, specify a list of security groups and subnets in the VPC. When you connect a function to a VPC, it can only access resources and the internet through that VPC. For more information, see [VPC Settings](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html).
+                        EOT
+                label = "VPC Security Group Ids"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Image.Entrypoint" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional for Image Package type.
+                        
+                        Comma-delimited list of commands to override the Image Entrypoint.
+                        
+                        Format: `entrypoint1, entrypoint2`
+                        
+                        
+                        EOT
+                label = "Entrypoint override"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Image.Command" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional for Image Package type.
+                        
+                        Comma-delimited list of commands to override the Image Entrypoint.
+                        
+                        Format: `command1, command2`
+                        EOT
+                label = "Command override"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.EnvironmentVariables" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `KeyName1=string,KeyName2=string`
+                        
+                        Environment variables that are accessible from function code during execution.
+                        EOT
+                label = "Environment Variables"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.EnvironmentVariablesKey" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        The ARN of the AWS Key Management Service (AWS KMS) key that’s used to encrypt your function’s environment variables. If it’s not provided, AWS Lambda uses a default service key.
+                        
+                        EOT
+                label = "Environment Variables Encryption Key"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.FunctionTimeout" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        The amount of time that Lambda allows a function to run before stopping it. The default is 3 seconds. The maximum allowed value is 900 seconds.
+                        EOT
+                label = "Timeout"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Tags" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `KeyName1=string,KeyName2=string`
+                        
+                        A list of tags to apply to the function.
+                        EOT
+                label = "Tags"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.FileSystemConfig" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `Arn=string,LocalMountPath=string`
+                        
+                        Connection settings for an Amazon EFS file system.
+                        EOT
+                label = "File System Config"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.TracingConfig" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `Mode=string`
+                        
+                        Set Mode to Active to sample and trace a subset of incoming requests with AWS X-Ray.
+                        EOT
+                label = "Tracing Config"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.DeadLetterConfig" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Optional.
+                        
+                        Format: `TargetArn=string`
+                        
+                        A dead letter queue configuration that specifies the queue or topic where Lambda sends asynchronous events when they fail processing. For more information, see [Dead Letter Queues](https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq).
+                        
+                        EOT
+                label = "Dead Letter Config"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Publish" {
+                display_settings = {
+                    Octopus.ControlType = "Select"
+                    Octopus.SelectOptions = <<-EOT
+                        Yes|Yes
+                        No|No
+                        EOT
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        Creates a [version](https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html) from the current code and configuration of a function. Use versions to create a snapshot of your function code and configuration that doesn’t change.
+                        
+                        **Important**: Lambda doesn’t publish a version if the function’s configuration and code haven’t changed since the last version. Use UpdateFunctionCode or UpdateFunctionConfiguration to update the function before publishing a version.
+                        EOT
+                label = "Publish"
+                default_value = "Yes"
+            }
+        }
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+
+        packages "AWS.Lambda.Package" {
+            acquisition_location = "NotAcquired"
+            properties = {
+                Extract = "False"
+                PackageParameterName = "AWS.Lambda.Package"
+                Purpose = ""
+                SelectionMode = "deferred"
+            }
+        }
+    }
+}
+
+step "set-inactive-alias-to-new-version-for-testing" {
+    name = "Set inactive alias to new version for testing"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            AWS.Lambda.Account = "Template.AWS.Account"
+            AWS.Lambda.Alias.FunctionVersion = "#{Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion}"
+            AWS.Lambda.Alias.Name = "inactive"
+            AWS.Lambda.Alias.Percent = "100"
+            AWS.Lambda.Function.Name = "#{Template.Lambda.Name}"
+            AWS.Lambda.Region = "#{Template.AWS.Region}"
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{AWS.Lambda.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{AWS.Lambda.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $functionName = $OctopusParameters["AWS.Lambda.Function.Name"]
+                $functionAliasName = $OctopusParameters["AWS.Lambda.Alias.Name"]
+                $functionAliasPercent = $OctopusParameters["AWS.Lambda.Alias.Percent"]
+                $functionVersion = $OctopusParameters["AWS.Lambda.Alias.FunctionVersion"]
+                
+                if ([string]::IsNullOrWhiteSpace($functionName))
+                {
+                	Write-Error "The parameter Function Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasName))
+                {
+                	Write-Error "The parameter Alias Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionVersion))
+                {
+                	Write-Error "The parameter Function Version is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasPercent))
+                {
+                	Write-Error "The parameter Alias Percent is required."
+                    Exit 1
+                }
+                
+                $newVersionPercent = [int]$functionAliasPercent
+                    
+                if ($newVersionPercent -le 0 -or $newVersionPercent -gt 100)
+                {
+                    Write-Error "The parameter Alias Percent must be between 1 and 100."
+                    exit 1
+                }
+                
+                Write-Host "Function Name: $functionName"
+                Write-Host "Function Version: $functionVersion"
+                Write-Host "Function Alias Name: $functionAliasName"
+                Write-Host "Function Alias Percent: $functionAliasPercent"
+                
+                $versionToUpdateTo = $functionVersion
+                if ($functionVersion.ToLower().Trim() -eq "latest" -or $functionVersion.ToLower().Trim() -eq "previous")
+                {
+                	Write-Highlight "The function version specified is $functionVersion, attempting to find the specific version number."
+                    $versionOutput = aws lambda list-versions-by-function --function-name "$functionName" --no-paginate
+                    $versionOutput = $versionOutput | ConvertFrom-JSON
+                    $versionList = @($versionOutput.Versions)
+                    
+                    if ($functionVersion.ToLower().Trim() -eq "previous" -and $versionList.Count -gt 2)
+                    {
+                    	$versionArrayIndex = $versionList.Count - 2
+                    }
+                    else
+                    {
+                    	$versionArrayIndex = $versionList.Count - 1
+                    }
+                    
+                    $versionToUpdateTo = $versionList[$versionArrayIndex].Version
+                    Write-Highlight "The alias will update to version $versionToUpdateTo"         
+                }
+                
+                try
+                {
+                  Write-Host "Publish set to yes with a function alias specified.  Attempting to find existing alias."
+                  $aliasInformation = aws lambda get-alias --function-name "$functionName" --name "$functionAliasName" 2> $null
+                
+                  Write-Host "The exit code from the alias lookup was $LASTEXITCODE"
+                  if ($LASTEXITCODE -eq 255 -or $LASTEXITCODE -eq 254)
+                  {
+                  	  Write-Highlight "The function's alias $functionAliasName does not exist."
+                      Write-Host "If you see an error right here you can safely ignore that."
+                	  $aliasInformation = $null
+                  }   
+                  else
+                  {
+                	  Write-Highlight "The function's alias $functionAliasName already exists."
+                	  $aliasInformation = $aliasInformation | ConvertFrom-JSON
+                	  Write-Host $aliasInformation
+                  }  
+                }
+                catch
+                {
+                  Write-Host "The alias specified $functionAliasName does not exist for $functionName.  Will create a new alias with that name."
+                  $aliasInformation = $null
+                }
+                
+                if ($null -ne $aliasInformation)
+                {
+                  	Write-Host "Comparing the existing alias version $($aliasInformation.FunctionVersion) with the the published version $versionToUpdateTo"
+                                    
+                   	if ($aliasInformation.FunctionVersion -ne $versionToUpdateTo)
+                    {
+                    	Write-Host "The alias $functionAliasName version $($aliasInformation.FunctionVersion) does not equal the published version $versionToUpdateTo"
+                            
+                        if ($newVersionPercent -eq 100)
+                        {
+                         	Write-Highlight "The percent for the new version of the function is 100%, updating the alias $functionAliasName to function version $versionToUpdateTo"
+                           	$newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo" --routing-config "AdditionalVersionWeights={}"
+                        }
+                        else
+                        {              	
+                            $newVersionPercent = $newVersionPercent / [double]100                       
+                                
+                            Write-Highlight "Updating the alias $functionAliasName so $functionAliasPercent of all traffic is routed to $versionToUpdateTo"
+                			  
+                   	        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={""$versionToUpdateTo""=$newVersionPercent}"
+                        }           
+                    }
+                    elseif ($newVersionPercent -eq 100)
+                    {
+                    	Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo and the percent sent in is 100, updating the function so all traffic is routed to that version."
+                        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={}"
+                    }
+                    else
+                    {
+                   		Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo.  Leaving as is."
+                    }
+                }
+                else
+                {
+                   	Write-Highlight "Creating the alias $functionAliasName with the version $versionToUpdateTo"
+                 	$newAliasInformation = aws lambda create-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo"
+                }
+                
+                if ($null -ne $newAliasInformation)
+                {
+                	Write-Host ($newAliasInformation | ConvertFrom-JSON)
+                }
+                
+                Write-Highlight "The alias has finished updating."
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        community_action_template_snapshot {
+            id = "CommunityActionTemplates-42"
+            version = 2
+
+            parameter "AWS.Lambda.Function.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The name of the function the alias will be attached to.  See [documentation](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/lambda/create-function.html#options)
+                        
+                        Examples:
+                        - Function name - my-function .
+                        - Function ARN - arn:aws:lambda:us-west-2:123456789012:function:my-function .
+                        - Partial ARN - 123456789012:function:my-function .
+                        
+                        The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.
+                        EOT
+                label = "Function Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Account" {
+                display_settings = {
+                    Octopus.ControlType = "AmazonWebServicesAccount"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The AWS Account with permissions to create / update AWS Lambdas.
+                        EOT
+                label = "AWS Account"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Region" {
+                display_settings = {
+                    Octopus.ControlType = "Select"
+                    Octopus.SelectOptions = <<-EOT
+                        us-east-2|US East (Ohio)
+                        us-east-1|US East (N. Virginia)
+                        us-west-1|US West (N. California)
+                        us-west-2|US West (Oregon)
+                        af-south-1|Africa (Cape Town)
+                        ap-east-1|Asia Pacific (Hong Kong)
+                        ap-south-1|Asia Pacific (Mumbai)
+                        ap-northeast-3|Asia Pacific (Osaka-Local)
+                        ap-northeast-2|Asia Pacific (Seoul)
+                        ap-southeast-1|Asia Pacific (Singapore)
+                        ap-southeast-2|Asia Pacific (Sydney)
+                        ap-northeast-1|Asia Pacific (Tokyo)
+                        ca-central-1|Canada (Central)
+                        eu-central-1|Europe (Frankfurt)
+                        eu-west-1|Europe (Ireland)
+                        eu-west-2|Europe (London)
+                        eu-south-1|Europe (Milan)
+                        eu-west-3|Europe (Paris)
+                        eu-north-1|Europe (Stockholm)
+                        me-south-1|Middle East (Bahrain)
+                        sa-east-1|South America (São Paulo)
+                        EOT
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The region where the function is in.
+                        EOT
+                label = "Region"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The [alias](https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html) for a Lambda function version. Use aliases to provide clients with a function identifier that you can update to invoke a different version.
+                        EOT
+                label = "Alias Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Percent" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The percent (between 0 and 100) of traffic to send to the version.
+                        
+                        - If the alias does not exist, this parameter is ignored and 100% of traffic is sent to the new alias.
+                        - If the alias exists and the function version is the same as the specified version no updates are performed.
+                        - If the alias exists and the value is 100, the alias is updated to the version specified in the `Function Version` parameter and all traffic will be routed to that.
+                        - If the alias exists and the value is less than 100, the alias function is updated to send that percent of traffic to the version specified in the `Function Version` parameter.
+                        
+                        **Please note:** Existing percentages will be automatically updated.  For example, the alias is configured to send 100% of the traffic to version 3, and you provide 20 for version 4.  Version 3 will be automatically adjusted to get 80% of the traffic and version 4 will get 20% of the traffic.
+                        EOT
+                label = "Alias Version Percent"
+                default_value = "100"
+            }
+
+            parameter "AWS.Lambda.Alias.FunctionVersion" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The function version to route traffic to for this alias.  Please note the function version <> to the package version.  The options are:
+                        
+                        - **Latest**: This step will find the most recent version of the function and use that.
+                        - **Previous**: This step will find the second to the most recent version of the function and use that.
+                        - **[Number]**: A specific version number to assign to the alias.
+                        
+                        If you are using the community step template [AWS - Deploy Lambda Function](https://library.octopus.com/step-templates/9b5ee984-bdd2-49f0-a78a-07e21e60da8a/actiontemplate-aws-deploy-lambda-function), that sets the output variable `PublishedVersion` you can leverage.
+                        EOT
+                label = "Function Version"
+                default_value = ""
+            }
+        }
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "test-inactive-app-url" {
+    name = "Test inactive app url"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $url = $OctopusParameters["Template.Lambda.Url.Inactive"]
+                
+                Write-Host "Testing $url"
+                
+                if ($url) {
+                  try {
+                      # Make the GET request
+                      $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
+                      $json = $response | ConvertTo-Json -Depth 10
+                      Write-Output $json
+                  } catch {
+                      Fail-Step "An error occurred: $_"
+                  }
+                }
+                else {
+                  Write-Warning "No url configured for this environment"
+                }
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
+
+step "approve-new-version" {
+    name = "Approve new version"
+
+    action {
+        action_type = "Octopus.Manual"
+        environments_variable = "#{Template.Environments.Production}"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "False"
+            Octopus.Action.Manual.Instructions = "Test and approve the [new version](#{Template.Lambda.Url.Inactive})."
+        }
+    }
+}
+
+step "set-active-alias-to-new-version" {
+    name = "Set active alias to new version"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            AWS.Lambda.Account = "Template.AWS.Account"
+            AWS.Lambda.Alias.FunctionVersion = "#{Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion}"
+            AWS.Lambda.Alias.Name = "active"
+            AWS.Lambda.Alias.Percent = "100"
+            AWS.Lambda.Function.Name = "#{Template.Lambda.Name}"
+            AWS.Lambda.Region = "#{Template.AWS.Region}"
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{AWS.Lambda.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{AWS.Lambda.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $functionName = $OctopusParameters["AWS.Lambda.Function.Name"]
+                $functionAliasName = $OctopusParameters["AWS.Lambda.Alias.Name"]
+                $functionAliasPercent = $OctopusParameters["AWS.Lambda.Alias.Percent"]
+                $functionVersion = $OctopusParameters["AWS.Lambda.Alias.FunctionVersion"]
+                
+                if ([string]::IsNullOrWhiteSpace($functionName))
+                {
+                	Write-Error "The parameter Function Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasName))
+                {
+                	Write-Error "The parameter Alias Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionVersion))
+                {
+                	Write-Error "The parameter Function Version is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasPercent))
+                {
+                	Write-Error "The parameter Alias Percent is required."
+                    Exit 1
+                }
+                
+                $newVersionPercent = [int]$functionAliasPercent
+                    
+                if ($newVersionPercent -le 0 -or $newVersionPercent -gt 100)
+                {
+                    Write-Error "The parameter Alias Percent must be between 1 and 100."
+                    exit 1
+                }
+                
+                Write-Host "Function Name: $functionName"
+                Write-Host "Function Version: $functionVersion"
+                Write-Host "Function Alias Name: $functionAliasName"
+                Write-Host "Function Alias Percent: $functionAliasPercent"
+                
+                $versionToUpdateTo = $functionVersion
+                if ($functionVersion.ToLower().Trim() -eq "latest" -or $functionVersion.ToLower().Trim() -eq "previous")
+                {
+                	Write-Highlight "The function version specified is $functionVersion, attempting to find the specific version number."
+                    $versionOutput = aws lambda list-versions-by-function --function-name "$functionName" --no-paginate
+                    $versionOutput = $versionOutput | ConvertFrom-JSON
+                    $versionList = @($versionOutput.Versions)
+                    
+                    if ($functionVersion.ToLower().Trim() -eq "previous" -and $versionList.Count -gt 2)
+                    {
+                    	$versionArrayIndex = $versionList.Count - 2
+                    }
+                    else
+                    {
+                    	$versionArrayIndex = $versionList.Count - 1
+                    }
+                    
+                    $versionToUpdateTo = $versionList[$versionArrayIndex].Version
+                    Write-Highlight "The alias will update to version $versionToUpdateTo"         
+                }
+                
+                try
+                {
+                  Write-Host "Publish set to yes with a function alias specified.  Attempting to find existing alias."
+                  $aliasInformation = aws lambda get-alias --function-name "$functionName" --name "$functionAliasName" 2> $null
+                
+                  Write-Host "The exit code from the alias lookup was $LASTEXITCODE"
+                  if ($LASTEXITCODE -eq 255 -or $LASTEXITCODE -eq 254)
+                  {
+                  	  Write-Highlight "The function's alias $functionAliasName does not exist."
+                      Write-Host "If you see an error right here you can safely ignore that."
+                	  $aliasInformation = $null
+                  }   
+                  else
+                  {
+                	  Write-Highlight "The function's alias $functionAliasName already exists."
+                	  $aliasInformation = $aliasInformation | ConvertFrom-JSON
+                	  Write-Host $aliasInformation
+                  }  
+                }
+                catch
+                {
+                  Write-Host "The alias specified $functionAliasName does not exist for $functionName.  Will create a new alias with that name."
+                  $aliasInformation = $null
+                }
+                
+                if ($null -ne $aliasInformation)
+                {
+                  	Write-Host "Comparing the existing alias version $($aliasInformation.FunctionVersion) with the the published version $versionToUpdateTo"
+                                    
+                   	if ($aliasInformation.FunctionVersion -ne $versionToUpdateTo)
+                    {
+                    	Write-Host "The alias $functionAliasName version $($aliasInformation.FunctionVersion) does not equal the published version $versionToUpdateTo"
+                            
+                        if ($newVersionPercent -eq 100)
+                        {
+                         	Write-Highlight "The percent for the new version of the function is 100%, updating the alias $functionAliasName to function version $versionToUpdateTo"
+                           	$newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo" --routing-config "AdditionalVersionWeights={}"
+                        }
+                        else
+                        {              	
+                            $newVersionPercent = $newVersionPercent / [double]100                       
+                                
+                            Write-Highlight "Updating the alias $functionAliasName so $functionAliasPercent of all traffic is routed to $versionToUpdateTo"
+                			  
+                   	        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={""$versionToUpdateTo""=$newVersionPercent}"
+                        }           
+                    }
+                    elseif ($newVersionPercent -eq 100)
+                    {
+                    	Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo and the percent sent in is 100, updating the function so all traffic is routed to that version."
+                        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={}"
+                    }
+                    else
+                    {
+                   		Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo.  Leaving as is."
+                    }
+                }
+                else
+                {
+                   	Write-Highlight "Creating the alias $functionAliasName with the version $versionToUpdateTo"
+                 	$newAliasInformation = aws lambda create-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo"
+                }
+                
+                if ($null -ne $newAliasInformation)
+                {
+                	Write-Host ($newAliasInformation | ConvertFrom-JSON)
+                }
+                
+                Write-Highlight "The alias has finished updating."
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        community_action_template_snapshot {
+            id = "CommunityActionTemplates-42"
+            version = 2
+
+            parameter "AWS.Lambda.Function.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The name of the function the alias will be attached to.  See [documentation](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/lambda/create-function.html#options)
+                        
+                        Examples:
+                        - Function name - my-function .
+                        - Function ARN - arn:aws:lambda:us-west-2:123456789012:function:my-function .
+                        - Partial ARN - 123456789012:function:my-function .
+                        
+                        The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.
+                        EOT
+                label = "Function Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Account" {
+                display_settings = {
+                    Octopus.ControlType = "AmazonWebServicesAccount"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The AWS Account with permissions to create / update AWS Lambdas.
+                        EOT
+                label = "AWS Account"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Region" {
+                display_settings = {
+                    Octopus.ControlType = "Select"
+                    Octopus.SelectOptions = <<-EOT
+                        us-east-2|US East (Ohio)
+                        us-east-1|US East (N. Virginia)
+                        us-west-1|US West (N. California)
+                        us-west-2|US West (Oregon)
+                        af-south-1|Africa (Cape Town)
+                        ap-east-1|Asia Pacific (Hong Kong)
+                        ap-south-1|Asia Pacific (Mumbai)
+                        ap-northeast-3|Asia Pacific (Osaka-Local)
+                        ap-northeast-2|Asia Pacific (Seoul)
+                        ap-southeast-1|Asia Pacific (Singapore)
+                        ap-southeast-2|Asia Pacific (Sydney)
+                        ap-northeast-1|Asia Pacific (Tokyo)
+                        ca-central-1|Canada (Central)
+                        eu-central-1|Europe (Frankfurt)
+                        eu-west-1|Europe (Ireland)
+                        eu-west-2|Europe (London)
+                        eu-south-1|Europe (Milan)
+                        eu-west-3|Europe (Paris)
+                        eu-north-1|Europe (Stockholm)
+                        me-south-1|Middle East (Bahrain)
+                        sa-east-1|South America (São Paulo)
+                        EOT
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The region where the function is in.
+                        EOT
+                label = "Region"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The [alias](https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html) for a Lambda function version. Use aliases to provide clients with a function identifier that you can update to invoke a different version.
+                        EOT
+                label = "Alias Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Percent" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The percent (between 0 and 100) of traffic to send to the version.
+                        
+                        - If the alias does not exist, this parameter is ignored and 100% of traffic is sent to the new alias.
+                        - If the alias exists and the function version is the same as the specified version no updates are performed.
+                        - If the alias exists and the value is 100, the alias is updated to the version specified in the `Function Version` parameter and all traffic will be routed to that.
+                        - If the alias exists and the value is less than 100, the alias function is updated to send that percent of traffic to the version specified in the `Function Version` parameter.
+                        
+                        **Please note:** Existing percentages will be automatically updated.  For example, the alias is configured to send 100% of the traffic to version 3, and you provide 20 for version 4.  Version 3 will be automatically adjusted to get 80% of the traffic and version 4 will get 20% of the traffic.
+                        EOT
+                label = "Alias Version Percent"
+                default_value = "100"
+            }
+
+            parameter "AWS.Lambda.Alias.FunctionVersion" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The function version to route traffic to for this alias.  Please note the function version <> to the package version.  The options are:
+                        
+                        - **Latest**: This step will find the most recent version of the function and use that.
+                        - **Previous**: This step will find the second to the most recent version of the function and use that.
+                        - **[Number]**: A specific version number to assign to the alias.
+                        
+                        If you are using the community step template [AWS - Deploy Lambda Function](https://library.octopus.com/step-templates/9b5ee984-bdd2-49f0-a78a-07e21e60da8a/actiontemplate-aws-deploy-lambda-function), that sets the output variable `PublishedVersion` you can leverage.
+                        EOT
+                label = "Function Version"
+                default_value = ""
+            }
+        }
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "aws-configure-lambda-alias" {
+    name = "AWS - Configure Lambda Alias"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            AWS.Lambda.Account = "Template.AWS.Account"
+            AWS.Lambda.Alias.FunctionVersion = "#{Octopus.ProcessTemplate.Action[Get active version].Output.ActiveVersion}"
+            AWS.Lambda.Alias.Name = "inactive"
+            AWS.Lambda.Alias.Percent = "100"
+            AWS.Lambda.Function.Name = "#{Template.Lambda.Name}"
+            AWS.Lambda.Region = "#{Template.AWS.Region}"
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{AWS.Lambda.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{AWS.Lambda.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $functionName = $OctopusParameters["AWS.Lambda.Function.Name"]
+                $functionAliasName = $OctopusParameters["AWS.Lambda.Alias.Name"]
+                $functionAliasPercent = $OctopusParameters["AWS.Lambda.Alias.Percent"]
+                $functionVersion = $OctopusParameters["AWS.Lambda.Alias.FunctionVersion"]
+                
+                if ([string]::IsNullOrWhiteSpace($functionName))
+                {
+                	Write-Error "The parameter Function Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasName))
+                {
+                	Write-Error "The parameter Alias Name is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionVersion))
+                {
+                	Write-Error "The parameter Function Version is required."
+                    Exit 1
+                }
+                
+                if ([string]::IsNullOrWhiteSpace($functionAliasPercent))
+                {
+                	Write-Error "The parameter Alias Percent is required."
+                    Exit 1
+                }
+                
+                $newVersionPercent = [int]$functionAliasPercent
+                    
+                if ($newVersionPercent -le 0 -or $newVersionPercent -gt 100)
+                {
+                    Write-Error "The parameter Alias Percent must be between 1 and 100."
+                    exit 1
+                }
+                
+                Write-Host "Function Name: $functionName"
+                Write-Host "Function Version: $functionVersion"
+                Write-Host "Function Alias Name: $functionAliasName"
+                Write-Host "Function Alias Percent: $functionAliasPercent"
+                
+                $versionToUpdateTo = $functionVersion
+                if ($functionVersion.ToLower().Trim() -eq "latest" -or $functionVersion.ToLower().Trim() -eq "previous")
+                {
+                	Write-Highlight "The function version specified is $functionVersion, attempting to find the specific version number."
+                    $versionOutput = aws lambda list-versions-by-function --function-name "$functionName" --no-paginate
+                    $versionOutput = $versionOutput | ConvertFrom-JSON
+                    $versionList = @($versionOutput.Versions)
+                    
+                    if ($functionVersion.ToLower().Trim() -eq "previous" -and $versionList.Count -gt 2)
+                    {
+                    	$versionArrayIndex = $versionList.Count - 2
+                    }
+                    else
+                    {
+                    	$versionArrayIndex = $versionList.Count - 1
+                    }
+                    
+                    $versionToUpdateTo = $versionList[$versionArrayIndex].Version
+                    Write-Highlight "The alias will update to version $versionToUpdateTo"         
+                }
+                
+                try
+                {
+                  Write-Host "Publish set to yes with a function alias specified.  Attempting to find existing alias."
+                  $aliasInformation = aws lambda get-alias --function-name "$functionName" --name "$functionAliasName" 2> $null
+                
+                  Write-Host "The exit code from the alias lookup was $LASTEXITCODE"
+                  if ($LASTEXITCODE -eq 255 -or $LASTEXITCODE -eq 254)
+                  {
+                  	  Write-Highlight "The function's alias $functionAliasName does not exist."
+                      Write-Host "If you see an error right here you can safely ignore that."
+                	  $aliasInformation = $null
+                  }   
+                  else
+                  {
+                	  Write-Highlight "The function's alias $functionAliasName already exists."
+                	  $aliasInformation = $aliasInformation | ConvertFrom-JSON
+                	  Write-Host $aliasInformation
+                  }  
+                }
+                catch
+                {
+                  Write-Host "The alias specified $functionAliasName does not exist for $functionName.  Will create a new alias with that name."
+                  $aliasInformation = $null
+                }
+                
+                if ($null -ne $aliasInformation)
+                {
+                  	Write-Host "Comparing the existing alias version $($aliasInformation.FunctionVersion) with the the published version $versionToUpdateTo"
+                                    
+                   	if ($aliasInformation.FunctionVersion -ne $versionToUpdateTo)
+                    {
+                    	Write-Host "The alias $functionAliasName version $($aliasInformation.FunctionVersion) does not equal the published version $versionToUpdateTo"
+                            
+                        if ($newVersionPercent -eq 100)
+                        {
+                         	Write-Highlight "The percent for the new version of the function is 100%, updating the alias $functionAliasName to function version $versionToUpdateTo"
+                           	$newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo" --routing-config "AdditionalVersionWeights={}"
+                        }
+                        else
+                        {              	
+                            $newVersionPercent = $newVersionPercent / [double]100                       
+                                
+                            Write-Highlight "Updating the alias $functionAliasName so $functionAliasPercent of all traffic is routed to $versionToUpdateTo"
+                			  
+                   	        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={""$versionToUpdateTo""=$newVersionPercent}"
+                        }           
+                    }
+                    elseif ($newVersionPercent -eq 100)
+                    {
+                    	Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo and the percent sent in is 100, updating the function so all traffic is routed to that version."
+                        $newAliasInformation = aws lambda update-alias --function-name "$functionName" --name "$functionAliasName" --routing-config "AdditionalVersionWeights={}"
+                    }
+                    else
+                    {
+                   		Write-Highlight "The alias $functionAliasName is already pointed to $versionToUpdateTo.  Leaving as is."
+                    }
+                }
+                else
+                {
+                   	Write-Highlight "Creating the alias $functionAliasName with the version $versionToUpdateTo"
+                 	$newAliasInformation = aws lambda create-alias --function-name "$functionName" --name "$functionAliasName" --function-version "$versionToUpdateTo"
+                }
+                
+                if ($null -ne $newAliasInformation)
+                {
+                	Write-Host ($newAliasInformation | ConvertFrom-JSON)
+                }
+                
+                Write-Highlight "The alias has finished updating."
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        community_action_template_snapshot {
+            id = "CommunityActionTemplates-42"
+            version = 2
+
+            parameter "AWS.Lambda.Function.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The name of the function the alias will be attached to.  See [documentation](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/lambda/create-function.html#options)
+                        
+                        Examples:
+                        - Function name - my-function .
+                        - Function ARN - arn:aws:lambda:us-west-2:123456789012:function:my-function .
+                        - Partial ARN - 123456789012:function:my-function .
+                        
+                        The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.
+                        EOT
+                label = "Function Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Account" {
+                display_settings = {
+                    Octopus.ControlType = "AmazonWebServicesAccount"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The AWS Account with permissions to create / update AWS Lambdas.
+                        EOT
+                label = "AWS Account"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Region" {
+                display_settings = {
+                    Octopus.ControlType = "Select"
+                    Octopus.SelectOptions = <<-EOT
+                        us-east-2|US East (Ohio)
+                        us-east-1|US East (N. Virginia)
+                        us-west-1|US West (N. California)
+                        us-west-2|US West (Oregon)
+                        af-south-1|Africa (Cape Town)
+                        ap-east-1|Asia Pacific (Hong Kong)
+                        ap-south-1|Asia Pacific (Mumbai)
+                        ap-northeast-3|Asia Pacific (Osaka-Local)
+                        ap-northeast-2|Asia Pacific (Seoul)
+                        ap-southeast-1|Asia Pacific (Singapore)
+                        ap-southeast-2|Asia Pacific (Sydney)
+                        ap-northeast-1|Asia Pacific (Tokyo)
+                        ca-central-1|Canada (Central)
+                        eu-central-1|Europe (Frankfurt)
+                        eu-west-1|Europe (Ireland)
+                        eu-west-2|Europe (London)
+                        eu-south-1|Europe (Milan)
+                        eu-west-3|Europe (Paris)
+                        eu-north-1|Europe (Stockholm)
+                        me-south-1|Middle East (Bahrain)
+                        sa-east-1|South America (São Paulo)
+                        EOT
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The region where the function is in.
+                        EOT
+                label = "Region"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Name" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The [alias](https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html) for a Lambda function version. Use aliases to provide clients with a function identifier that you can update to invoke a different version.
+                        EOT
+                label = "Alias Name"
+                default_value = ""
+            }
+
+            parameter "AWS.Lambda.Alias.Percent" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The percent (between 0 and 100) of traffic to send to the version.
+                        
+                        - If the alias does not exist, this parameter is ignored and 100% of traffic is sent to the new alias.
+                        - If the alias exists and the function version is the same as the specified version no updates are performed.
+                        - If the alias exists and the value is 100, the alias is updated to the version specified in the `Function Version` parameter and all traffic will be routed to that.
+                        - If the alias exists and the value is less than 100, the alias function is updated to send that percent of traffic to the version specified in the `Function Version` parameter.
+                        
+                        **Please note:** Existing percentages will be automatically updated.  For example, the alias is configured to send 100% of the traffic to version 3, and you provide 20 for version 4.  Version 3 will be automatically adjusted to get 80% of the traffic and version 4 will get 20% of the traffic.
+                        EOT
+                label = "Alias Version Percent"
+                default_value = "100"
+            }
+
+            parameter "AWS.Lambda.Alias.FunctionVersion" {
+                display_settings = {
+                    Octopus.ControlType = "SingleLineText"
+                }
+                help_text = <<-EOT
+                        Required.
+                        
+                        The function version to route traffic to for this alias.  Please note the function version <> to the package version.  The options are:
+                        
+                        - **Latest**: This step will find the most recent version of the function and use that.
+                        - **Previous**: This step will find the second to the most recent version of the function and use that.
+                        - **[Number]**: A specific version number to assign to the alias.
+                        
+                        If you are using the community step template [AWS - Deploy Lambda Function](https://library.octopus.com/step-templates/9b5ee984-bdd2-49f0-a78a-07e21e60da8a/actiontemplate-aws-deploy-lambda-function), that sets the output variable `PublishedVersion` you can leverage.
+                        EOT
+                label = "Function Version"
+                default_value = ""
+            }
+        }
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
+step "test-active-app-url" {
+    name = "Test active app url"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $url = $OctopusParameters["Project.Lambda.Url.Active"]
+                
+                Write-Host "Testing $url"
+                
+                if ($url) {
+                  try {
+                      # Make the GET request
+                      $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
+                      $json = $response | ConvertTo-Json -Depth 10
+                      Write-Output $json
+                  } catch {
+                      Fail-Step "An error occurred: $_"
+                  }
+                }
+                else {
+                  Write-Warning "No url configured for this environment"
+                }
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
