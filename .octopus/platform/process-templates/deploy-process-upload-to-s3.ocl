@@ -92,7 +92,7 @@ step "upload-a-package-to-an-aws-s3-bucket" {
 
         container {
             feed = "#{Template.Octopus.WorkerFeed}"
-            image = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
         }
 
         packages {
