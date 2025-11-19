@@ -80,8 +80,8 @@ step "upload-a-package-to-an-aws-s3-bucket" {
         action_type = "Octopus.AwsUploadS3"
         properties = {
             Octopus.Action.Aws.AssumeRole = "False"
-            Octopus.Action.Aws.Region = "#{Template.AWS.RegionCode}"
-            Octopus.Action.Aws.S3.BucketName = "#{Template.Bucket.Region}"
+            Octopus.Action.Aws.Region = "#{Template.Bucket.Region}"
+            Octopus.Action.Aws.S3.BucketName = "#{Template.Bucket.Name}"
             Octopus.Action.Aws.S3.PackageOptions = "{\"bucketKey\":\"\",\"bucketKeyBehaviour\":\"Filename\",\"bucketKeyPrefix\":\"\",\"storageClass\":\"STANDARD\",\"cannedAcl\":\"private\",\"variableSubstitutionPatterns\":\"\",\"structuredVariableSubstitutionPatterns\":\"\",\"metadata\":[],\"tags\":[]}"
             Octopus.Action.Aws.S3.TargetMode = "EntirePackage"
             Octopus.Action.AwsAccount.UseInstanceRole = "False"
