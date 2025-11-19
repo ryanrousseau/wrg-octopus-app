@@ -123,6 +123,10 @@ step "get-active-version" {
                 
                 echo "The active version is $result"
                 
+                if [ -z "$result" ]; then
+                  result="PREVIOUS"
+                fi
+                
                 set_octopusvariable "ActiveVersion" $result
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
@@ -1430,9 +1434,9 @@ step "set-active-alias-to-new-version" {
 }
 
 step "aws-configure-lambda-alias" {
-    name = "AWS - Configure Lambda Alias"
+    name = "Set inactive alias to previous version"
 
-    action {
+    action "set-inactive-alias-to-previous-version" {
         action_type = "Octopus.AwsRunScript"
         properties = {
             AWS.Lambda.Account = "Template.AWS.Account"
