@@ -106,3 +106,32 @@ step "upload-a-package-to-an-aws-s3-bucket" {
         }
     }
 }
+
+step "list-bucket" {
+    name = "List bucket"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.Bucket.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $bucket = $OctopusParameters["Template.Bucket.Name"]
+                
+                & aws s3 ls s3://$bucket
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
