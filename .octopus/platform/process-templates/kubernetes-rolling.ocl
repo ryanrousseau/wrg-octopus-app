@@ -1,4 +1,4 @@
-name = "Kubernetes - Rolling"
+name = "Deploy Process - Kubernetes - Rolling"
 description = ""
 
 icon {
