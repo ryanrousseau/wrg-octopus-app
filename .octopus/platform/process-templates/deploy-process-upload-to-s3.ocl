@@ -108,9 +108,9 @@ step "upload-a-package-to-an-aws-s3-bucket" {
 }
 
 step "list-bucket" {
-    name = "List bucket"
+    name = "List bucket contents"
 
-    action {
+    action "list-bucket-contents" {
         action_type = "Octopus.AwsRunScript"
         properties = {
             Octopus.Action.Aws.AssumeRole = "False"
@@ -121,7 +121,7 @@ step "list-bucket" {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $bucket = $OctopusParameters["Template.Bucket.Name"]
                 
-                & aws s3 ls s3://$bucket
+                & aws s3 ls s3://$bucket --recursive
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
