@@ -1,6 +1,11 @@
 name = "Deploy Process - AWS Lambda - Blue-Green"
 description = ""
 
+icon {
+    color = "#927002"
+    id = "aws"
+}
+
 parameter "Template.Octopus.WorkerPool" {
     display_settings = {
         Octopus.ControlType = "WorkerPool"
@@ -744,6 +749,8 @@ step "deploy-app" {
 
         packages "AWS.Lambda.Package" {
             acquisition_location = "NotAcquired"
+            feed = "octopus-server-built-in"
+            package_id = ""
             properties = {
                 Extract = "False"
                 PackageParameterName = "AWS.Lambda.Package"
@@ -1676,7 +1683,7 @@ step "test-active-app-url" {
         properties = {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $url = $OctopusParameters["Project.Lambda.Url.Active"]
+                $url = $OctopusParameters["Template.Lambda.Url.Active"]
                 
                 Write-Host "Testing $url"
                 
