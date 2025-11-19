@@ -1066,11 +1066,13 @@ step "create-inactive-alias" {
                 $version = $OctopusParameters["Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion"]
                 $name = $OctopusParameters["Template.Lambda.Name"]
                 
-                & aws lambda create-alias `
-                  --function-name $name `
-                  --description "alias for live version of function" `
-                  --function-version $version `
-                  --name active
+                
+                $inactive = $(aws lambda get-alias --function-name $name --name inactive)
+                
+                if ($inactive -ne $null) {
+                  aws lambda create-alias --function-name $name --description "alias for live version of function" --function-version $version --name inactive
+                }
+                
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
