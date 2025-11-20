@@ -52,11 +52,21 @@ parameter "Template.Docker.Account" {
     label = "Docker Account"
 }
 
+parameter "Template.Environments.Ephemeral" {
+    display_settings = {
+        Octopus.ControlType = "Environments"
+    }
+    help_text = ""
+    is_optional = true
+    label = "Ephemeral Environments"
+}
+
 step "verify-configuration" {
     name = "Verify configuration"
 
     action {
         action_type = "Octopus.Script"
+        excluded_environments_variable = "#{Template.Environments.Ephemeral}"
         is_required = true
         notes = "This step verifies the configuration parameters for the template."
         properties = {
@@ -117,10 +127,9 @@ step "attach-sbom-to-release" {
 
     action {
         action_type = "Octopus.Script"
+        excluded_environments_variable = "#{Template.Environments.Ephemeral}"
         is_required = true
-        notes = <<-EOT
-                This step pulls the SBOM from the package and attaches it as a deployment artifact.
-                EOT
+        notes = "This step pulls the SBOM from the package and attaches it as a deployment artifact."
         properties = {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
@@ -166,10 +175,9 @@ step "verify-build-artifacts" {
 
     action {
         action_type = "Octopus.Script"
+        excluded_environments_variable = "#{Template.Environments.Ephemeral}"
         is_required = true
-        notes = <<-EOT
-                This step loops through the process's packages to verify their attestations using GitHub's CLI tooling.
-                EOT
+        notes = "This step loops through the process's packages to verify their attestations using GitHub's CLI tooling."
         properties = {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
@@ -180,7 +188,7 @@ step "verify-build-artifacts" {
                 
                 Write-Host "Logging into DockerHub with user $dockerUser"
                 docker login --username $dockerUser --password $dockerPassword
-
+                
                 $buildInformation = $OctopusParameters["Octopus.Deployment.PackageBuildInformation"]
                 $OctopusEnvironmentName = $OctopusParameters["Octopus.Environment.Name"]
                 
