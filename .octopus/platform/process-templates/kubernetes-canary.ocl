@@ -120,6 +120,43 @@ parameter "Template.Container" {
     label = "App Container"
 }
 
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+step "generate-configuration" {
+    name = "Generate configuration"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $environmentSlug = $OctopusParameters["Octopus.Environment.Slug"]
+                $projectSlug = $OctopusParameters["Octopus.Project.Slug"]
+                $spaceSlug = $OctopusParameters["Octopus.Space.Slug"]
+                
+                $namespace = "$spaceSlug-$projectSlug-$environmentSlug"
+                $deployment = "$projectSlug-deployment"
+                $service = "$projectSlug-service"
+                
+                Set-OctopusVariable -Name "Namespace" -Value $namespace
+                Set-OctopusVariable -Name "Deployment" -Value $deployment
+                Set-OctopusVariable -Name "Service" -Value $service
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
+
 step "create-namespace-if-it-does-not-exist" {
     name = "Create namespace if it does not exist"
     properties = {
@@ -131,7 +168,7 @@ step "create-namespace-if-it-does-not-exist" {
         properties = {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 # Set varaibles
-                $clusterNamespace = $OctopusParameters["Template.Cluster.Namespace"]
+                $clusterNamespace = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace"]
                 
                 # Get existing namespaces
                 Write-Host "Retrieving namespaces ..."
@@ -174,7 +211,7 @@ step "create-service" {
                 apiVersion: v1
                 kind: Service
                 metadata:
-                  name: #{Template.Service.Name}
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Service}
                   labels:
                     component: #{Template.Labels.Component}
                     type: main
@@ -189,7 +226,7 @@ step "create-service" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -205,10 +242,11 @@ step "scale-up-existing-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
-                $deployment = $OctopusParameters["Template.Deployment.Name"]
+                $deployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment"]
                 $replicas = [int]$OctopusParameters["Template.Deployment.Replicas"]
                 
                 kubectl scale --current-replicas=$replicas --replicas=$(2 * $replicas) deployment/$deployment
@@ -240,7 +278,7 @@ step "deploy-canary-phase-1" {
                 apiVersion: apps/v1
                 kind: Deployment
                 metadata:
-                  name: #{Template.Deployment.Name}-canary
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment}-canary
                 spec:
                   replicas: #{Template.Deployment.Replicas}
                   selector:
@@ -262,7 +300,7 @@ step "deploy-canary-phase-1" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/canary-phase-1.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -298,7 +336,7 @@ step "add-canary-pods-to-service" {
                 apiVersion: v1
                 kind: Service
                 metadata:
-                  name: #{Template.Service.Name}
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Service}
                   labels:
                     component: #{Template.Labels.Component}
                 spec:
@@ -365,9 +403,9 @@ step "deploy-canary-phase-2" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $deployment = $OctopusParameters["Template.Deployment.Name"] + "-canary"
+                $deployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment"] + "-canary"
                 $replicas = [int]$OctopusParameters["Template.Deployment.Replicas"]
                 
                 kubectl scale --current-replicas=$replicas --replicas=$(2 * $replicas) deployment/$deployment
@@ -427,11 +465,11 @@ step "deploy-canary-phase-3" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
-                $deployment = $OctopusParameters["Template.Deployment.Name"]
+                $deployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment"]
                 $replicas = [int]$OctopusParameters["Template.Deployment.Replicas"]
                 
                 kubectl scale --current-replicas=$(2 * $replicas) --replicas=$replicas deployment/$deployment
@@ -501,7 +539,7 @@ step "update-main" {
                 apiVersion: apps/v1
                 kind: Deployment
                 metadata:
-                  name: #{Template.Deployment.Name}
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment}
                 spec:
                   replicas: #{Template.Deployment.Replicas}
                   selector:
@@ -523,7 +561,7 @@ step "update-main" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-main.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -559,7 +597,7 @@ step "remove-canary" {
                 apiVersion: v1
                 kind: Service
                 metadata:
-                  name: #{Template.Service.Name}
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Service}
                   labels:
                     component: #{Template.Labels.Component}
                     type: main
@@ -574,7 +612,7 @@ step "remove-canary" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/deploy-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -598,7 +636,7 @@ step "delete-canary-deployment" {
                 apiVersion: apps/v1
                 kind: Deployment
                 metadata:
-                  name: #{Template.Deployment.Name}-canary
+                  name: #{Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment}-canary
                 spec:
                   replicas: 0
                   selector:
@@ -620,7 +658,7 @@ step "delete-canary-deployment" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/delete-canary-deployment.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -684,13 +722,13 @@ step "rollback-canary-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
                 if ("#{Octopus.Action[Detect cancelled canary rollout].Output.Cancelled}" -ieq "true") {
                 
-                	$deployment = $OctopusParameters["Template.Deployment.Name"]
+                	$deployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment"]
                 	$canary = $deployment + "-canary"
                 
                 	kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
