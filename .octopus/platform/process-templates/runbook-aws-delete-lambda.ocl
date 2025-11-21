@@ -1,0 +1,119 @@
+name = "Runbook - AWS - Delete Lambda"
+description = ""
+
+icon {
+    color = "#927002"
+    id = "aws"
+}
+
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+parameter "Template.Octopus.WorkerFeed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = "Container Feed"
+}
+
+parameter "Template.Octopus.WorkerImage" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Worker Image"
+
+    value "octopusdeploy/worker-tools:6.4.0-ubuntu.22.04" {}
+}
+
+parameter "Template.AWS.Account" {
+    display_settings = {
+        Octopus.ControlType = "AmazonWebServicesAccount"
+    }
+    help_text = ""
+    label = "AWS Account"
+}
+
+parameter "Template.AWS.Region" {
+    display_settings = {
+        Octopus.ControlType = "Select"
+        Octopus.SelectOptions = <<-EOT
+            us-east-1|US East (N. Virginia)
+            us-west-1|US West (N. California)
+            us-west-2|US West (Oregon)
+            af-south-1|Africa (Cape Town)
+            eu-central-1|Europe (Frankfurt)
+            EOT
+    }
+    help_text = ""
+    label = "AWS Region"
+
+    value "us-west-2" {}
+}
+
+parameter "Template.Lambda.Name" {
+    display_settings = {
+        Octopus.ControlType = "SingleLineText"
+    }
+    help_text = ""
+    label = "Lambda Name"
+}
+
+step "generate-configuration" {
+    name = "Generate configuration"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $environmentSlug = $OctopusParameters["Octopus.Environment.Slug"]
+                $projectSlug = $OctopusParameters["Octopus.Project.Slug"]
+                $spaceSlug = $OctopusParameters["Octopus.Space.Slug"]
+                
+                $lambdaName = "$spaceSlug-$projectSlug-$environmentSlug"
+                
+                Set-OctopusVariable -Name "LambdaName" -Value $namespace
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
+
+step "delete-lambda" {
+    name = "Delete Lambda"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                functionName=$(get_octopusvariable "Template.Lambda.Name")  
+                
+                aws lambda delete-function --function-name $functionName
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
