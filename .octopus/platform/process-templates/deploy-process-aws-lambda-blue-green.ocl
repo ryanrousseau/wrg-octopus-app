@@ -1719,6 +1719,46 @@ step "aws-configure-lambda-alias" {
     }
 }
 
+step "get-active-app-url" {
+    name = "Get active app url"
+
+    action {
+        action_type = "Octopus.AwsRunScript"
+        properties = {
+            Octopus.Action.Aws.AssumeRole = "False"
+            Octopus.Action.Aws.Region = "#{Template.AWS.Region}"
+            Octopus.Action.AwsAccount.UseInstanceRole = "False"
+            Octopus.Action.AwsAccount.Variable = "#{Template.AWS.Account}"
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $version = $OctopusParameters["Octopus.ProcessTemplate.Action[Deploy app].Output.PublishedVersion"]
+                $name = $OctopusParameters["Template.Lambda.Name"]
+                
+                $response = $(aws lambda get-function-url-config --function-name $name --qualifier active --output json)
+                
+                if ($response -eq $null) {
+                  $response = $(aws lambda create-function-url-config --function-name $name --qualifier active --auth-type NONE --output json)
+                
+                  & aws lambda add-permission --function-name $name --statement-id "FunctionURLAllowPublicAccess-$name-active" --action "lambda:InvokeFunctionUrl" --principal "*" --function-url-auth-type "NONE" --qualifier active
+                }
+                
+                $response = $response | ConvertFrom-Json -Depth 10
+                
+                Set-OctopusVariable -Name "Url" -Value $response.FunctionUrl
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Octopus.WorkerFeed}"
+            image = "#{Template.Octopus.WorkerImage}"
+        }
+    }
+}
+
 step "test-active-app-url" {
     name = "Test active app url"
 
@@ -1727,7 +1767,7 @@ step "test-active-app-url" {
         properties = {
             Octopus.Action.RunOnServer = "true"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $url = $OctopusParameters["Template.Lambda.Url.Active"]
+                $url = $OctopusParameters["Octopus.ProcessTemplate.Action[Get active app url].Output.Url"]
                 
                 Write-Host "Testing $url"
                 
