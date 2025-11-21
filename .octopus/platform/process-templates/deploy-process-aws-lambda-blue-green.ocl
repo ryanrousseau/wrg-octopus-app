@@ -81,22 +81,6 @@ parameter "Template.Lambda.FunctionRole" {
     label = "Lambda Function Role"
 }
 
-parameter "Template.Lambda.Url.Inactive" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = ""
-    label = "Lambda Inactive Url"
-}
-
-parameter "Template.Lambda.Url.Active" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = ""
-    label = "Lambda Active Url"
-}
-
 parameter "Template.Environments.Production" {
     display_settings = {
         Octopus.ControlType = "Environments"
