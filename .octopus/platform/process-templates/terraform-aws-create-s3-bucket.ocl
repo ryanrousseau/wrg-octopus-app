@@ -106,7 +106,7 @@ step "plan-terraform-apply" {
                   
                   backend "s3" {
                     bucket = "demo-octopus-app-bucket"
-                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket.json"
                     region = "us-west-2"
                   }
                 }
@@ -182,7 +182,7 @@ step "apply-terraform" {
                   
                   backend "s3" {
                     bucket = "demo-octopus-app-bucket"
-                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket.json"
                     region = "us-west-2"
                   }
                 }
