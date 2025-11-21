@@ -107,7 +107,7 @@ step "plan-a-terraform-destroy" {
                   
                   backend "s3" {
                     bucket = "demo-octopus-app-bucket"
-                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket"
+                    key = "#{Octopus.Project.Name | ToLower}-#{Octopus.Environment.Name | ToLower}-s3-bucket.json"
                     region = "us-west-2"
                   }
                 }
