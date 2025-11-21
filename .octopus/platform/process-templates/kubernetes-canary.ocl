@@ -6,26 +6,6 @@ icon {
     id = "crow"
 }
 
-parameter "Template.Cluster.Namespace" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = "The namespace to deploy the application into"
-    label = "Cluster namespace"
-
-    value "" {}
-}
-
-parameter "Template.Deployment.Name" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = "The name of the deployment to create/update"
-    label = "Deployment name"
-
-    value "" {}
-}
-
 parameter "Template.Deployment.Replicas" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
@@ -52,16 +32,6 @@ parameter "Template.Labels.Component" {
     label = "Component label"
 
     value "app" {}
-}
-
-parameter "Template.Service.Name" {
-    display_settings = {
-        Octopus.ControlType = "SingleLineText"
-    }
-    help_text = "The name of the service to create/update."
-    label = "Service name"
-
-    value "" {}
 }
 
 parameter "Template.Service.Port" {
