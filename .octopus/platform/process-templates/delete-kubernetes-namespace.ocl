@@ -9,12 +9,37 @@ parameter "Template.Tag" {
     label = "Target Tag"
 }
 
-parameter "Template.Namespace" {
+parameter "Template.Octopus.WorkerPool" {
     display_settings = {
-        Octopus.ControlType = "SingleLineText"
+        Octopus.ControlType = "WorkerPool"
     }
     help_text = ""
-    label = "Namespace"
+    label = "Worker Pool"
+}
+
+step "generate-configuration" {
+    name = "Generate configuration"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $environmentSlug = $OctopusParameters["Octopus.Environment.Slug"]
+                $projectSlug = $OctopusParameters["Octopus.Project.Slug"]
+                $spaceSlug = $OctopusParameters["Octopus.Space.Slug"]
+                
+                $namespace = "$spaceSlug-$projectSlug-$environmentSlug"
+                
+                Set-OctopusVariable -Name "Namespace" -Value $namespace
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
 }
 
 step "delete-namespace" {
@@ -27,9 +52,9 @@ step "delete-namespace" {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $namespace = $OctopusParameters["Template.Namespace"]
+                $clusterNamespace = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace"]
                 
-                kubectl delete namespace $namespace
+                kubectl delete namespace $clusterNamespace
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
