@@ -111,21 +111,6 @@ step "plan-a-terraform-destroy" {
                     region = "us-west-2"
                   }
                 }
-                
-                # Configure the AWS Provider
-                provider "aws" {
-                  region = "#{Template.AWS.Region.Code}"
-                }
-                
-                resource "aws_s3_bucket" "my_bucket" {
-                  bucket = "#{Template.AWS.Bucket.Name}"
-                  acl    = "private"
-                  force_destroy = true
-                  tags = {
-                    Environment = "#{Octopus.Environment.Name}"
-                    Project     = "#{Octopus.Project.Name}"
-                  }
-                }
                 EOT
             Octopus.Action.Terraform.TemplateParameters = "{}"
         }
@@ -189,20 +174,6 @@ step "destroy-terraform-resources" {
                   }
                 }
                 
-                # Configure the AWS Provider
-                provider "aws" {
-                  region = "#{Template.AWS.Region.Code}"
-                }
-                
-                resource "aws_s3_bucket" "my_bucket" {
-                  bucket = "#{Template.AWS.Bucket.Name}"
-                  acl    = "private"
-                  force_destroy = true
-                  tags = {
-                    Environment = "#{Octopus.Environment.Name}"
-                    Project     = "#{Octopus.Project.Name}"
-                  }
-                }
                 EOT
             Octopus.Action.Terraform.TemplateParameters = "{}"
         }
