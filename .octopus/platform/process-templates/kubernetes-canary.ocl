@@ -320,7 +320,7 @@ step "add-canary-pods-to-service" {
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-canary/add-canary-pods-to-service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Template.Cluster.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
