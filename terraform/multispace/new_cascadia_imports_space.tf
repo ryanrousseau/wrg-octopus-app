@@ -19,6 +19,7 @@ module "new_cascadia_imports_space_dev_test_prod" {
   }
 
   space_id = module.new_cascadia_imports_space.id
+  test_env_name = "Homologation"
 }
 
 resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
