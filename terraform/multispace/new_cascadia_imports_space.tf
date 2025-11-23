@@ -7,6 +7,7 @@ module "new_cascadia_imports_space" {
 
   name        = "New Cascadia Imports"
   description = "Space for the NCI subsidiary"
+  slug        = "nci"
   space_managers_teams  = [module.platform_engineering_team.id]
   is_task_queue_stopped = false
 }

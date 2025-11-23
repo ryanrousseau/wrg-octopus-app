@@ -11,6 +11,7 @@ resource "octopusdeploy_space" "space" {
   name                        = var.name
   is_default                  = false
   is_task_queue_stopped       = var.is_task_queue_stopped
+  slug                        = var.slug
   space_managers_team_members = var.space_managers_team_members
   space_managers_teams        = var.space_managers_teams
 }

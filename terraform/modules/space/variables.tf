@@ -11,6 +11,11 @@ variable "is_task_queue_stopped" {
   default = false
 }
 
+variable "slug" {
+  type = string
+  default = null
+}
+
 variable "space_managers_team_members" {
   type    = list(string)
   default = []
