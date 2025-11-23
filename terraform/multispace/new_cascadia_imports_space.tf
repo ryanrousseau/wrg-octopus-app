@@ -22,6 +22,19 @@ module "new_cascadia_imports_space_dev_test_prod" {
   space_id = module.new_cascadia_imports_space.id
 }
 
+module "new_cascadia_imports_space_administration" {
+  source = "../modules/environment"
+
+  providers = {
+    octopusdeploy = octopusdeploy
+  }
+
+  name       = "Administration"
+  sort_order = 4
+
+  space_id = module.new_cascadia_imports_space.id
+}
+
 resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
   description = "Hotfix lifecycle"
   name        = "Hotfix"
