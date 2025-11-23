@@ -282,41 +282,6 @@ step "approval-swap" {
     }
 }
 
-step "reload-configuration" {
-    name = "Reload configuration"
-
-    action {
-        action_type = "Octopus.Script"
-        properties = {
-            Octopus.Action.RunOnServer = "true"
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $environmentSlug = $OctopusParameters["Octopus.Environment.Slug"]
-                $projectSlug = $OctopusParameters["Octopus.Project.Slug"]
-                $spaceSlug = $OctopusParameters["Octopus.Space.Slug"]
-                
-                $namespace = "$spaceSlug-$projectSlug-$environmentSlug"
-                $deployment = "$projectSlug-deployment"
-                $service = "$projectSlug-service"
-                
-                Set-OctopusVariable -Name "Namespace" -Value $namespace
-                Set-OctopusVariable -Name "Deployment" -Value $deployment
-                Set-OctopusVariable -Name "Service" -Value $service
-                
-                Set-OctopusVariable -Name "PreviewReplicas" -Value 1
-                Set-OctopusVariable -Name "Replicas" -Value 2
-                Set-OctopusVariable -Name "Component" -Value "app"
-                Set-OctopusVariable -Name "PreviewPort" -Value 8090
-                Set-OctopusVariable -Name "Port" -Value 80
-                
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
-            OctopusUseBundledTooling = "False"
-        }
-        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
-    }
-}
-
 step "create-service" {
     name = "Create service"
     properties = {
@@ -334,22 +299,22 @@ step "create-service" {
                 apiVersion: v1
                 kind: Service
                 metadata:
-                  name: #{Octopus.ProcessTemplate.Action[Reload configuration].Output.Service}
+                  name: #{Octopus.Action[Deploy application-Generate configuration].Output.Service}
                   labels:
-                    component: #{Octopus.ProcessTemplate.Action[Reload configuration].Output.Component}
+                    component: #{Octopus.Action[Deploy application-Generate configuration].Output.Component}
                 spec:
                   type: ClusterIP
                   selector:
-                    component: #{Octopus.ProcessTemplate.Action[Reload configuration].Output.Component}
+                    component: #{Octopus.Action[Deploy application-Generate configuration].Output.Component}
                     deployment: #{Octopus.Deployment.Id}
                   ports:
-                    - port: #{Octopus.ProcessTemplate.Action[Reload configuration].Output.Port}
-                      targetPort: #{Octopus.ProcessTemplate.Action[Reload configuration].Output.Port}
+                    - port: #{Octopus.Action[Deploy application-Generate configuration].Output.Port}
+                      targetPort: #{Octopus.Action[Deploy application-Generate configuration].Output.Port}
                       name: http-port
                 
                 EOT
             Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "template-scripts/kubernetes-blue-green/service.yml"
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Reload configuration].Output.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.Action[Deploy application-Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptSource = "Inline"
         }
         worker_pool_variable = ""
@@ -365,12 +330,12 @@ step "scale-down-previous-deployment" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.ProcessTemplate.Action[Reload configuration].Output.Namespace}"
+            Octopus.Action.KubernetesContainers.Namespace = "#{Octopus.Action[Deploy application-Generate configuration].Output.Namespace}"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $ErrorActionPreference = "Continue"
                 
-                $deploymentName = $OctopusParameters["Octopus.ProcessTemplate.Action[Reload configuration].Output.Deployment"]
-                $previousDeployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Get active deployment].Output.PreviousDeployment"]
+                $deploymentName = $OctopusParameters["Octopus.Action[Deploy application-Generate configuration].Output.Deployment"]
+                $previousDeployment = $OctopusParameters["Octopus..Action[Deploy application-Get active deployment].Output.PreviousDeployment"]
                 
                 Write-Highlight "Scaling down $previousDeployment"
                 
