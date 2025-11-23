@@ -648,9 +648,10 @@ step "rollback-canary-deployment" {
                 if ("#{Octopus.Action[Deploy application-Detect cancelled canary rollout].Output.Cancelled}" -ieq "true") {
                 
                 	$deployment = $OctopusParameters["Octopus.Action[Deploy application-Generate configuration].Output.Deployment"]
+                    $replicas = $OctopusParameters["Octopus.Action[Deploy application-Generate configuration].Output.Replicas"]
                 	$canary = $deployment + "-canary"
                 
-                	kubectl scale --current-replicas=3 --replicas=1 deployment/$deployment
+                	kubectl scale --replicas=$replicas deployment/$deployment
                 
                     kubectl delete deployment $canary
                 }

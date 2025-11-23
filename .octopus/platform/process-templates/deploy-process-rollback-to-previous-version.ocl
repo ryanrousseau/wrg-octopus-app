@@ -1,0 +1,52 @@
+name = "Deploy Process - Rollback to Previous Version"
+description = ""
+
+parameter "Template.Octopus.ApiKey" {
+    display_settings = {
+        Octopus.ControlType = "Sensitive"
+    }
+    label = "Octopus API Key"
+}
+
+parameter "Template.Octopus.WorkerPool" {
+    display_settings = {
+        Octopus.ControlType = "WorkerPool"
+    }
+    help_text = ""
+    label = "Worker Pool"
+}
+
+step "deploy-previous-version" {
+    name = "Deploy previous version"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $server = $OctopusParameters["Octopus.Web.ServerUri"]
+                $apiKey = $OctopusParameters["Template.Octopus.ApiKey"]
+                $space = $OctopusParameters["Octopus.Space.Name"]
+                $project = $OctopusParameters["Octopus.Project.Name"]
+                $environment = $OctopusParameters["Octopus.Environment.Name"]
+                $currentVersion = $OctopusParameters["Octopus.Release.Number"]
+                $previousVersion = $OctopusParameters["Octopus.Release.CurrentForEnvironment.Number"]
+
+                if ($currentVersion -ne $previousVersion) {
+                  Write-Highlight "Rolling back to version $previousVersion"
+
+                  octopus login --server $server --api-key $apiKey --no-prompt
+
+                  octopus release deploy --space $space --project $project --version $previousVersion --environment $environment --output-format 'basic' --no-prompt
+                } else {
+                  Write-Highlight "Already at latest successful version"
+                }
+
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+    }
+}
