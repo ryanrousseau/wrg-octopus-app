@@ -9,6 +9,14 @@ parameter "Template.Octopus.WorkerPool" {
     label = "Worker Pool"
 }
 
+parameter "Template.Worker.ContainerFeed" {
+    display_settings = {
+        Octopus.ControlType = "Feed"
+    }
+    help_text = ""
+    label = ""
+}
+
 step "generate-value" {
     name = "Generate value"
 
@@ -74,5 +82,10 @@ step "write-value-after" {
             OctopusUseBundledTooling = "False"
         }
         worker_pool_variable = "#{Template.Octopus.WorkerPool}"
+
+        container {
+            feed = "#{Template.Worker.ContainerFeed}"
+            image = "octopusdeploy/worker-tools:6.4.0-ubuntu.22.04"
+        }
     }
 }
