@@ -48,6 +48,14 @@ parameter "Template.Octopus.WorkerPool" {
     label = "Worker Pool"
 }
 
+parameter "Template.Approval.Team" {
+    display_settings = {
+        Octopus.ControlType = "Teams"
+    }
+    help_text = ""
+    label = "Approval Team"
+}
+
 step "generate-configuration" {
     name = "Generate configuration"
 
@@ -67,12 +75,12 @@ step "generate-configuration" {
                 Set-OctopusVariable -Name "Namespace" -Value $namespace
                 Set-OctopusVariable -Name "Deployment" -Value $deployment
                 Set-OctopusVariable -Name "Service" -Value $service
-
+                
                 Set-OctopusVariable -Name "Replicas" -Value 1
                 Set-OctopusVariable -Name "Component" -Value "app"
                 Set-OctopusVariable -Name "Port" -Value 80
                 Set-OctopusVariable -Name "HttpPort" -Value "http-port"
-
+                
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
@@ -311,6 +319,7 @@ step "approve-canary-phase-1" {
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 1"
+            Octopus.Action.Manual.ResponsibleTeamIds = "#{Template.Approval.Team}"
             Octopus.Action.RunOnServer = "false"
         }
     }
@@ -373,6 +382,7 @@ step "approve-canary-phase-2" {
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 2"
+            Octopus.Action.Manual.ResponsibleTeamIds = "#{Template.Approval.Team}"
             Octopus.Action.RunOnServer = "false"
         }
     }
@@ -439,6 +449,7 @@ step "approve-canary-phase-3" {
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
             Octopus.Action.Manual.Instructions = "Approve canary phase 2"
+            Octopus.Action.Manual.ResponsibleTeamIds = "#{Template.Approval.Team}"
             Octopus.Action.RunOnServer = "false"
         }
     }
