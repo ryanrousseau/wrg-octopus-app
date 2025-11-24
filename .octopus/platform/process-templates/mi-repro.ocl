@@ -17,6 +17,14 @@ parameter "Template.Worker.ContainerFeed" {
     label = ""
 }
 
+parameter "Template.Target.Tags" {
+    display_settings = {
+        Octopus.ControlType = "TargetTags"
+    }
+    help_text = ""
+    label = "Target Tag(s)"
+}
+
 step "generate-value" {
     name = "Generate value"
 
@@ -35,11 +43,14 @@ step "generate-value" {
 
 step "write-value-before" {
     name = "Write value - before"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Target.Tags}"
+    }
 
     action {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $value = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate value].Output.Message"]
                 
@@ -49,7 +60,6 @@ step "write-value-before" {
             Octopus.Action.Script.Syntax = "PowerShell"
             OctopusUseBundledTooling = "False"
         }
-        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
     }
 }
 
@@ -67,11 +77,14 @@ step "manual-intervention-required" {
 
 step "write-value-after" {
     name = "Write value - after"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Target.Tags}"
+    }
 
     action {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.RunOnServer = "true"
+            Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $value = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate value].Output.Message"]
                 
@@ -80,12 +93,6 @@ step "write-value-after" {
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
             OctopusUseBundledTooling = "False"
-        }
-        worker_pool_variable = "#{Template.Octopus.WorkerPool}"
-
-        container {
-            feed = "#{Template.Worker.ContainerFeed}"
-            image = "octopusdeploy/worker-tools:6.4.0-ubuntu.22.04"
         }
     }
 }
