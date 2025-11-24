@@ -52,12 +52,12 @@ step "write-value-before" {
         properties = {
             Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $value = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate value].Output.Message"]
+                $(get_octopusvariable "Octopus.ProcessTemplate.Action[Generate value].Output.Message")
                 
-                write-highlight $value
+                echo $value
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.Script.Syntax = "Bash"
             OctopusUseBundledTooling = "False"
         }
     }
@@ -86,12 +86,12 @@ step "write-value-after" {
         properties = {
             Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                $value = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate value].Output.Message"]
+                $(get_octopusvariable "Octopus.ProcessTemplate.Action[Generate value].Output.Message")
                 
-                write-highlight $value
+                echo $value
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.Script.Syntax = "Bash"
             OctopusUseBundledTooling = "False"
         }
     }
