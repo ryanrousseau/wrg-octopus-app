@@ -379,7 +379,8 @@ step "bootstrap-target" {
         properties = {
             Octopus.Action.RunOnServer = "false"
             Octopus.Action.Script.ScriptBody = <<-EOT
-                Remove-IISSite -Name "Default Web Site" -Confirm:$false
+                Import-Module WebAdministration
+                Get-Website | Remove-Website -Confirm:$false
                 
                 choco install dotnet-aspnetcoremodule-v2 -y
                 choco install gh -y
