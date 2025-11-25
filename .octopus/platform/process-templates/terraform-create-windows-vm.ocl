@@ -230,7 +230,7 @@ step "apply-terraform" {
                   
                   backend "s3" {
                     bucket = "#{Template.AWS.S3.Bucket}"
-                    key = "windows-ec2.json"
+                    key = "#{Octopus.Space.Slug}-#{Octopus.Project.Slug}-#{Octopus.Environment.Slug}-windows-ec2.json"
                     region = "#{Template.AWS.Region.Code}"
                   }
                     
