@@ -230,99 +230,14 @@ step "destroy-terraform-resources" {
                   
                   backend "s3" {
                     bucket = "#{Template.AWS.S3.Bucket}"
-                    key = "windows-ec2.json"
+                    key = "#{Octopus.Space.Slug}-#{Octopus.Project.Slug}-#{Octopus.Environment.Slug}-linux-ec2.json"
                     region = "#{Template.AWS.Region.Code}"
                   }
                     
                 }
                 
-                data "aws_subnets" "public" {
-                  filter {
-                    name   = "vpc-id"
-                    values = ["#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.VpcId}"]
-                  }
-                }
-                
-                output "public_subnet_ids" {
-                  value = data.aws_subnets.public.ids
-                }
-                
-                data "template_file" "windows-userdata" {
-                    template = <<EOF
-                    <powershell>
-                Install-WindowsFeature -name Web-Server -IncludeManagementTools
-                New-NetFirewallRule -DisplayName "Octopus Tentacle" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 10933
-                
-                # Install chocolaty
-                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-                      
-                # Set temp location
-                $env:TEMP = "c:\temp"
-                $env:TMP = "c:\temp"
-                
-                # Use chocolaty to install tentacle
-                choco install octopusdeploy.tentacle -y
-                
-                # Configure tentacle
-                $publicDns = (Invoke-RestMethod http://169.254.169.254/latest/meta-data/public-hostname)
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" create-instance --config "c:\octopus\home"
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" new-certificate --if-blank
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" configure --noListen False --reset-trust --app "c:\octopus\applications" --port "10933"
-                Write-Host "Running register worker..."
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" register-with --server "#{Octopus.Web.ServerUri}" --apiKey "#{Template.Octopus.APIKey}" --space "#{Octopus.Space.Name}" --name "$($env:COMPUTERNAME)" --environment "#{Octopus.Environment.Name}" --role "IIS" --role "#{Octopus.Project.Name}" --publicHostName $publicDns
-                Write-Host "Finished register worker..."
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --install
-                & "C:\Program Files\Octopus Deploy\Tentacle\Tentacle.exe" service --start
-                
-                # Install .net sdks
-                choco install dotnet-6.0-sdk -y
-                choco install dotnet-8.0-sdk -y
-                
-                # Install PowerShell Core
-                choco install powershell-core -y
-                
-                    </powershell>
-                    EOF
-                }
-                
-                
-                # Configure the AWS Provider
-                provider "aws" {
-                  region = "#{Template.AWS.Region.Code}"
-                }
-                
-                resource "aws_instance" "windows-vm" {
-                    subnet_id = data.aws_subnets.public.ids[0]   
-                    user_data = data.template_file.windows-userdata.rendered
-                    ami = "${var.octopus_aws_windows_ami_id}"
-                    instance_type = "t3.medium"
-                    key_name = "#{Template.AWS.KeyPair.Name}"
-                    security_groups = ["${var.octopus_aws_security_group_id}"]
-                    get_password_data = true
-                
-                    # root disk
-                    root_block_device {
-                        volume_size           = "70"
-                        delete_on_termination = true
-                    }
-                
-                    tags = {
-                        Name = "Windows IIS Ec2"
-                    }
-                }
-                
-                variable "octopus_aws_security_group_id" {
-                    type = string
-                    default = "#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}"
-                }
-                
-                variable "octopus_aws_windows_ami_id" {
-                    type = string
-                    default = "#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.WindowsAMIId}"
-                }
-                
                 EOT
-            Octopus.Action.Terraform.TemplateParameters = "{\"octopus_aws_security_group_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.SecurityGroupId}\",\"octopus_aws_windows_ami_id\":\"#{Octopus.ProcessTemplate.Action[Get AWS Resource Ids].Output.WindowsAMIId}\"}"
+            Octopus.Action.Terraform.TemplateParameters = "{}"
         }
         worker_pool_variable = "#{Template.Worker.Pool}"
 
