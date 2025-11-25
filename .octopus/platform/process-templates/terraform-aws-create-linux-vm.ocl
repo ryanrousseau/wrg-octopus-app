@@ -329,9 +329,9 @@ step "apply-terraform" {
                 
                 # Get version of RHEL
                 source /etc/os-release
-                if [ ${VERSION_ID%.*} -lt 8 ]
+                if [ $${VERSION_ID%.*} -lt 8 ]
                 then majorver=7
-                elif [ ${VERSION_ID%.*} -lt 9 ]
+                elif [ $${VERSION_ID%.*} -lt 9 ]
                 then majorver=8
                 else majorver=9
                 fi
