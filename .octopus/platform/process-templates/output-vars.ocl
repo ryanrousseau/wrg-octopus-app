@@ -1,7 +1,6 @@
 name = "Output vars"
 description = ""
 
-
 parameter "Template.Deployment.Replicas" {
     display_settings = {
         Octopus.ControlType = "SingleLineText"
@@ -150,8 +149,8 @@ step "deploy-canary-phase-2" {
             Octopus.Action.Script.ScriptBody = <<-EOT
                 $deployment = $OctopusParameters["Octopus.ProcessTemplate.Action[Generate configuration].Output.Deployment"] + "-canary"
                 $replicas = [int]$OctopusParameters["Template.Deployment.Replicas"]
-                
-                kubectl scale --current-replicas=$replicas --replicas=$(2 * $replicas) deployment/$deployment
+                $deployment
+                #kubectl scale --current-replicas=$replicas --replicas=$(2 * $replicas) deployment/$deployment
                 
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
