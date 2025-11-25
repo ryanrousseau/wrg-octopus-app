@@ -238,7 +238,7 @@ step "apply-terraform" {
                   
                   backend "s3" {
                     bucket = "#{Template.AWS.S3.Bucket}"
-                    key = "windows-ec2.json"
+                    key = "#{Octopus.Space.Slug}-#{Octopus.Project.Slug}-#{Octopus.Environment.Slug}-linux-ec2.json"
                     region = "#{Template.AWS.Region.Code}"
                   }
                     
@@ -246,20 +246,47 @@ step "apply-terraform" {
                 
                 data "aws_ami" "ubuntu" {
                     most_recent = true
-
+                
                     filter {
                         name   = "name"
                         values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
                     }
-
+                
                     filter {
                         name   = "virtualization-type"
                         values = ["hvm"]
                     }
-
+                
                     owners = ["099720109477"] # Canonical
                 }
-
+                
+                # RHEL 8.5
+                data "aws_ami" "rhel_8_5" {
+                  most_recent = true
+                
+                  owners = ["309956199498"] // Red Hat's Account ID
+                
+                  filter {
+                    name   = "name"
+                    values = ["RHEL-8.5*"]
+                  }
+                
+                  filter {
+                    name   = "architecture"
+                    values = ["x86_64"]
+                  }
+                
+                  filter {
+                    name   = "root-device-type"
+                    values = ["ebs"]
+                  }
+                
+                  filter {
+                    name   = "virtualization-type"
+                    values = ["hvm"]
+                  }
+                }
+                
                 data "aws_subnets" "public" {
                   filter {
                     name   = "vpc-id"
@@ -274,14 +301,14 @@ step "apply-terraform" {
                 data "template_file" "linux-userdata" {
                     template = <<EOF
                 #!/bin/bash
-
+                
                 domain="#{Template.Octopus.Domain}"
                 apikey="#{Template.Octopus.ApiKey}"
                 space="#{Octopus.Space.Name}"
                 environment="#{Octopus.Environment.Name}"
                 tags="#{Template.Tag}"
                 tenant="#{Octopus.Tenant.Name}"
-
+                
                 serverUrl="https://$domain"   # The url of your Octopus server
                 serverCommsPort=443            # The communication port the Octopus Server is listening on (10943 by default)
                 apiKey=$apikey
@@ -291,25 +318,38 @@ step "apply-terraform" {
                 configFilePath="/etc/octopus/default/tentacle-default.config"
                 applicationPath="/home/Octopus/Applications/"
                 serverCommsAddress="https://polling.$domain" #demo.octopus.app"
-
+                
                 IFS=',' read -r -a roles <<< "$rolesArg"
-
-                apt update -y && sudo apt install -y --no-install-recommends gnupg curl ca-certificates apt-transport-https && \
-                install -m 0755 -d /etc/apt/keyrings && \
-                curl -fsSL https://apt.octopus.com/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/octopus.gpg && \
-                chmod a+r /etc/apt/keyrings/octopus.gpg && \
-                echo \
-                "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/octopus.gpg] https://apt.octopus.com/ \
-                stable main" | \
-                tee /etc/apt/sources.list.d/octopus.list > /dev/null && \
-                apt update -y && sudo apt install tentacle -y
                 
+                curl https://rpm.octopus.com/tentacle.repo -o /etc/yum.repos.d/tentacle.repo
+                yum install tentacle -y
                 
-                wget https://github.com/PowerShell/PowerShell/releases/download/v7.5.2/powershell_7.5.2-1.deb_amd64.deb
-                sudo dpkg -i powershell_7.5.2-1.deb_amd64.deb
-                sudo apt-get install -f -y
-                rm powershell_7.5.2-1.deb_amd64.deb
-
+                ###################################
+                # Prerequisites
+                
+                # Get version of RHEL
+                source /etc/os-release
+                if [ ${VERSION_ID%.*} -lt 8 ]
+                then majorver=7
+                elif [ ${VERSION_ID%.*} -lt 9 ]
+                then majorver=8
+                else majorver=9
+                fi
+                
+                # Download the Microsoft RedHat repository package
+                curl -sSL -O https://packages.microsoft.com/config/rhel/$majorver/packages-microsoft-prod.rpm
+                
+                # Register the Microsoft RedHat repository
+                sudo rpm -i packages-microsoft-prod.rpm
+                
+                # Delete the downloaded package after installing
+                rm packages-microsoft-prod.rpm
+                
+                # Update package index files
+                sudo dnf update
+                # Install PowerShell
+                sudo dnf install powershell -y
+                
                 /opt/octopus/tentacle/Tentacle create-instance --config "$configFilePath"
                 /opt/octopus/tentacle/Tentacle new-certificate --if-blank
                 /opt/octopus/tentacle/Tentacle configure --noListen True --reset-trust --app "$applicationPath"
@@ -328,7 +368,7 @@ step "apply-terraform" {
                 resource "aws_instance" "ubuntu-vm" {
                     subnet_id = data.aws_subnets.public.ids[0]   
                     user_data = data.template_file.linux-userdata.rendered
-                    ami = data.aws_ami.ubuntu.id
+                    ami = data.aws_ami.rhel_8_5.id
                     instance_type = "t3.medium"
                     key_name = "#{Template.AWS.KeyPair.Name}"
                     vpc_security_group_ids = ["${var.octopus_aws_security_group_id}"]
@@ -390,6 +430,5 @@ step "health-check" {
             Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
         }
-        worker_pool_variable = "#{Template.Worker.Pool}"
     }
 }
