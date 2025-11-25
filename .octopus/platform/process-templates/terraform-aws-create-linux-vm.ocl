@@ -290,7 +290,7 @@ step "apply-terraform" {
                     template = <<EOF
                 #!/bin/bash
                 
-                domain="#{Template.Octopus.Domain}"
+                domain="wrg.octopus.app"
                 apikey="#{Template.Octopus.ApiKey}"
                 space="#{Octopus.Space.Name}"
                 environment="#{Octopus.Environment.Name}"
