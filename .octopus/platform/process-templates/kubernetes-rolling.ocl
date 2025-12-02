@@ -285,6 +285,8 @@ step "deploy-app" {
                 namespace="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
                 port=80
                 
+                echo "##octopus[stderr-error]"
+                
                 echo "$service.$namespace:$port"
                 
                 status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Features)
