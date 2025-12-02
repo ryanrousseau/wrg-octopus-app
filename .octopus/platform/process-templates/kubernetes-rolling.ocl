@@ -285,6 +285,8 @@ step "deploy-app" {
                 namespace="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
                 port=80
                 
+                echo "$service.$namespace:$port"
+                
                 curl $service.$namespace:$port/Features > features.$environment.json
                 curl $service.$namespace:$port/Version > version.$environment.json
                 
