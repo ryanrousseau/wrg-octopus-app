@@ -273,4 +273,32 @@ step "deploy-app" {
         }
         worker_pool_variable = ""
     }
+
+    action "test-service" {
+        action_type = "Octopus.Script"
+        name = "Test service"
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                environment="#{Octopus.Environment.Slug}"
+                service="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Service}"
+                namespace="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
+                port=80
+                
+                curl $service.$namespace:$port/Features > features.$environment.json
+                curl $service.$namespace:$port/Version > version.$environment.json
+                
+                cat features.$environment.json
+                cat version.$environment.json
+                
+                new_octopusartifact features.$environment.json
+                new_octopusartifact version.$environment.json
+                
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool_variable = ""
+    }
 }
