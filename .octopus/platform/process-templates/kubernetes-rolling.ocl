@@ -287,9 +287,17 @@ step "deploy-app" {
                 
                 echo "$service.$namespace:$port"
                 
-                curl $service.$namespace:$port/Features
-                curl $service.$namespace:$port/Version 
+                status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Features)
                 
+                if [ "$http_status" -ne 200 ]; then
+                  fail_step "Call to $service.$namespace:$port/Features failed"
+                fi
+                
+                status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Version)
+                
+                if [ "$http_status" -ne 200 ]; then
+                  fail_step "Call to $service.$namespace:$port/Version failed"
+                fi
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "Bash"
