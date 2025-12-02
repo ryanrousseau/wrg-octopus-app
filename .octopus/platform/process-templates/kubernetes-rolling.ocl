@@ -288,7 +288,16 @@ step "deploy-app" {
                 echo "$service.$namespace:$port"
                 
                 curl $service.$namespace:$port/Features > features.$environment.json
+                
+                if [ $? -ne 0 ]; then
+                  fail_step "curl $service.$namespace:$port/Features failed"
+                fi
+                
                 curl $service.$namespace:$port/Version > version.$environment.json
+                
+                if [ $? -ne 0 ]; then
+                  fail_step "curl $service.$namespace:$port/Version failed"
+                fi
                 
                 cat features.$environment.json
                 cat version.$environment.json
