@@ -291,7 +291,7 @@ step "deploy-app" {
                 
                 status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Features)
                 
-                if [ "$http_status" -ne 200 ]; then
+                if [ "$status" -ne 200 ]; then
                   fail_step "Call to $service.$namespace:$port/Features failed"
                 fi
                 
