@@ -63,7 +63,7 @@ step "generate-configuration" {
                 Set-OctopusVariable -Name "PreviewReplicas" -Value 1
                 Set-OctopusVariable -Name "Replicas" -Value 2
                 Set-OctopusVariable -Name "Component" -Value "app"
-                Set-OctopusVariable -Name "PreviewPort" -Value 8090
+                Set-OctopusVariable -Name "PreviewPort" -Value 80
                 Set-OctopusVariable -Name "Port" -Value 80
                 
                 EOT
@@ -263,6 +263,46 @@ step "waiting-period" {
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
             Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool_variable = ""
+    }
+}
+
+step "test-preview-service" {
+    name = "Test preview service"
+    properties = {
+        Octopus.Action.TargetRoles = "#{Template.Tag}"
+    }
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.RunOnServer = "false"
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                environment="#{Octopus.Environment.Slug}"
+                service="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Service}-preview"
+                namespace="#{Octopus.ProcessTemplate.Action[Generate configuration].Output.Namespace}"
+                port=80
+                
+                echo "##octopus[stderr-error]"
+                
+                echo "$service.$namespace:$port"
+                
+                status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Features)
+                
+                if [ "$status" -ne 200 ]; then
+                  fail_step "Call to $service.$namespace:$port/Features failed"
+                fi
+                
+                status=$(curl -s -o /dev/null -w "%{http_code}" $service.$namespace:$port/Version)
+                
+                if [ "$status" -ne 200 ]; then
+                  fail_step "Call to $service.$namespace:$port/Version failed"
+                fi
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
         }
         worker_pool_variable = ""
     }
