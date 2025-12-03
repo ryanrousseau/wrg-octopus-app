@@ -301,7 +301,7 @@ step "test-preview-service" {
                 fi
                 EOT
             Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.Script.Syntax = "Bash"
             OctopusUseBundledTooling = "False"
         }
         worker_pool_variable = ""
