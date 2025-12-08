@@ -491,18 +491,15 @@ step "scan-for-vulnerabilities" {
                 display_settings = {
                     Octopus.ControlType = "Package"
                 }
+                help_text = ""
                 label = "Application package containing the SBOM to scan"
                 default_value = ""
             }
         }
 
-        container {
-            feed = "#{Template.Verify.ExecutionContainerFeed}"
-            image = "octopusdeploy/worker-tools:6.5.0-ubuntu.22.04"
-        }
-
         packages "application" {
             acquisition_location = "Server"
+            feed = "octopus-server-built-in"
             package_id = ""
             properties = {
                 Extract = "True"
