@@ -24,4 +24,203 @@ process {
             value = "WorkerPools-22"
         }
     }
+
+    step "run-an-azure-script" {
+        name = "Run an Azure Script"
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    # Fix ANSI Color on PWSH Core issues when displaying objects
+                    if ($PSEdition -eq "Core") {
+                        $PSStyle.OutputRendering = "PlainText"
+                    }
+                    
+                    function Get-Environments
+                    {
+                      # Define parameters
+                      param(
+                        $OctopusUri,
+                        $token,
+                        $SpaceId
+                      )
+                    
+                      $take = 30
+                      $count = 1
+                      $pageNumber = 0
+                      $headers = @{ "Authorization" = "Bearer $token" }
+                      $environments = @()
+                    
+                      Write-Verbose "Getting page 1 of environments for space $SpaceId"
+                      $response = Invoke-RestMethod -Uri "$OctopusUri/api/$spaceId/environments?take=$take" -Headers $headers
+                      $total = $projects.TotalResults
+                    
+                      while ($pageNumber -le $response.LastPageNumber) {
+                        $environments += $response.Items
+                    
+                        $pageNumber += 1
+                        $skip = $pageNumber * $take
+                        if ($pageNumber -gt $response.LastPageNumber) {
+                            break
+                        }
+                    
+                        Write-Host "Getting page $($pageNumber + 1) of projects for space $spaceId"
+                        $response = Invoke-RestMethod -Uri "$OctopusUri/api/$spaceId/environments?take=$take" -Headers $headers
+                      }
+                    
+                      return $environments
+                    }
+                    
+                    function Get-OctopusItems 
+                    {
+                    	# Define parameters
+                        param(
+                        	$OctopusUri,
+                            $token,
+                            $SkipCount = 0,
+                            $PageNumber = 1
+                        )
+                        
+                        # Define working variables
+                        $items = @()
+                        $skipQueryString = ""
+                        $headers = @{ "Authorization" = "Bearer $token" }
+                    
+                        # Check to see if there is already a querystring
+                        if ($octopusUri.Contains("?"))
+                        {
+                            $skipQueryString = "&skip="
+                        }
+                        else
+                        {
+                            $skipQueryString = "?skip="
+                        }
+                    
+                        $skipQueryString += $SkipCount
+                        
+                        # Get initial set
+                        $resultSet = Invoke-RestMethod -Uri "$($OctopusUri)$skipQueryString" -Method GET -Headers $headers
+                    
+                        # Check to see if it returned an item collection
+                        if ($resultSet.Items)
+                        {
+                            # Store call results
+                            $items += $resultSet.Items
+                        
+                            # Check to see if resultset is bigger than page amount
+                            if ($PageNumber -lt $resultSet.NumberOfPages)
+                            {
+                                # Increment skip count
+                                $SkipCount += $resultSet.ItemsPerPage
+                    
+                                # Recurse
+                                $items += Get-OctopusItems -OctopusUri $OctopusUri -ApiKey $ApiKey -SkipCount $SkipCount -PageNumber ($PageNumber + 1)
+                            }
+                        }
+                        else
+                        {
+                            return $resultSet
+                        }
+                        
+                    
+                        # Return results
+                        return $items
+                    }
+                    
+                    # Get Variables
+                    $octopusUrl = $OctopusParameters["Octopus.Web.ServerUri"]
+                    $token = $OctopusParameters["Octopus.Action[Authenticate-Authenticate with OIDC].Output.AccessToken"]
+                    $workerPoolName = "Hosted Ubuntu"
+                    $tenantSpaceName = $OctopusParameters["Octopus.Deployment.Tenant.Name"]
+                    $machineName = "demo-octopus-app-aks-main" #$OctopusParameters['Project.Azure.AKS.Cluster.Name']
+                    
+                    # Get spaces
+                    Write-Host "Getting list of spaces on instance ..."
+                    $spaces = Get-OctopusItems -OctopusUri "$octopusUrl/api/spaces"  -Token $token
+                    $adminSpace = $spaces | Where-Object {$_.Name -eq "Administration"}
+                    $tenantSpace = $spaces | Where-Object {$_.Name -eq $tenantSpaceName}
+                    
+                    # Get K8s agent
+                    Write-Host "Getting K8s agent ..."
+                    $kubernetesAgentTarget = Get-OctopusItems -OctopusUri "$octopusURL/api/$($adminSpace.Id)/machines?name=$machineName" -Token $token
+                    
+                    # Replace roles
+                    $kubernetesAgentTarget.Roles = @("demo-k8s-cluster", "octopub")
+                    $kubernetesAgentTarget.EnvironmentIds = @()
+                    $kubernetesAgentTarget.Id = $null
+                    
+                    try
+                    {
+                    	# Get space machines
+                        $spaceMachines = Get-OctopusItems -OctopusUri "$octopusURL/api/$($tenantSpace.Id)/machines"  -Token $token
+                    
+                        # Check to see if machine is already registered
+                        if ($null -eq ($spaceMachines | Where-Object { $_.Name -eq $machineName }))
+                        {
+                          # Get space environment list
+                          $spaceEnvironments = Get-Environments -OctopusUri $octopusURL  -Token $token -SpaceId $tenantSpace.Id
+                    
+                          # Loop through environments
+                          foreach ($environment in $spaceEnvironments)
+                          {
+                            $kubernetesAgentTarget.EnvironmentIds += $environment.Id
+                          }
+                    
+                          # Get default machine policy
+                          $machinePolicy = Get-OctopusItems -OctopusUri "$octopusURL/api/$($tenantSpace.Id)/machinepolicies?partialName='Default Machine Policy'"  -Token $token
+                          $kubernetesAgentTarget.MachinePolicyId = $machinePolicy.Id
+                          $kubernetesAgentTarget.SpaceId = $tenantSpace.Id
+                          $kubernetesAgentTarget.IsDisabled = $false
+                          $kubernetesAgentTarget.TenantTags = @()
+                    
+                          Write-Host ($kubernetesAgentTarget | ConvertTo-Json -Depth 10)
+                          
+                          # Add target to space
+                          Write-Host "Adding agent to space $octopusURL/api/$($tenantSpace.Id)/machines"
+                          Invoke-RestMethod -Method Post -Uri "$octopusURL/api/$($tenantSpace.Id)/machines" -Body ($kubernetesAgentTarget | ConvertTo-Json -Depth 10) -Headers @{ "Authorization" = "Bearer $token" }     
+                        }
+                        else
+                        {
+                          # Get current machine
+                          $spaceMachine = ($spaceMachines | Where-Object { $_.Name -eq $machineName })
+                    
+                          # Update the target 
+                          $spaceMachine.Thumbprint = $kubernetesAgentTarget.Thumbprint
+                          $spaceMachine.Endpoint = $kubernetesAgentTarget.Endpoint
+                          $spaceMachine.Roles = $kubernetesAgentTarget.Roles
+                          $spaceMachine.TenantTags = @()
+                    
+                          Invoke-RestMethod -Method Put -Uri "$octopusURL/api/$($tenantSpace.Id)/machines/$($spaceMachine.Id)" -Body ($spaceMachine | ConvertTo-JSON -Depth 10) -Headers @{ "Authorization" = "Bearer $token" }
+                        }
+                    
+                    }
+                    catch
+                    {
+                    	if (($null -ne $_.Exception.Response) -and ($_.Exception.Response.StatusCode -eq "Forbidden"))
+                    	{
+                    		# Insufficient permissions
+                    		Write-Host "Insufficient permission on space $($space.Name) ..."
+                    	}
+                    	else 
+                    	{
+                    		# Something else happened
+                    		throw
+                    	}
+                    }
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
+
+            container {
+                feed = "docker-hub"
+                image = "octopusdeploy/worker-tools:6.5.0-ubuntu.22.04"
+            }
+        }
+    }
 }
