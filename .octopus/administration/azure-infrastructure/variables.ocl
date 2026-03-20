@@ -1,0 +1,5 @@
+variable "Project.Octopus.Account" {
+    type = "GenericOidcAccount"
+
+    value "octopus-configuration-manager" {}
+}
