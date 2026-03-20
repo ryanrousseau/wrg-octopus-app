@@ -10,4 +10,18 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    process_template "authenticate" {
+        name = "Authenticate"
+        process_template_slug = "octopus-authenticate-with-oidc"
+        version_mask = "1.X"
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.OidcAccount" {
+            value = "Project.Octopus.Account"
+        }
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.WorkerPool" {
+            value = "WorkerPools-22"
+        }
+    }
+}
