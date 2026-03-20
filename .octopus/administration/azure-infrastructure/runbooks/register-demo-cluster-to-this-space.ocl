@@ -11,4 +11,100 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    process_template "authenticate" {
+        name = "Authenticate"
+        process_template_slug = "octopus-authenticate-with-oidc"
+        version_mask = "1.X"
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.OidcAccount" {
+            value = "Project.Octopus.Account"
+        }
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.WorkerPool" {
+            value = "WorkerPools-22"
+        }
+    }
+
+    step "register-cluster-as-a-target" {
+        name = "Register cluster as a target"
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    $instanceName = "#{Octopus.Web.ServerUri | UriPart Host}"
+                    $slug = $instanceName.Replace(".", "-")
+                    $namespace = "oa-$slug"
+                    $installName = $namespace
+                    
+                    # Get project variables
+                    $clusterName = "demo-octopus-app-aks-main"
+                    $resourceGroup = "demo.octopus.app"
+                    
+                    # Get credential for AKS cluster
+                    $env:KUBECONFIG = "$PWD/config"
+                    az aks get-credentials --name $clusterName --resource-group $resourceGroup
+                    
+                    # Get access token
+                    $token = $OctopusParameters["Octopus.Action[Authenticate-Authenticate with OIDC].Output.AccessToken"]
+                    $header = @{ "Authorization" = "Bearer $token" }
+                    $response = Invoke-RestMethod -Method Post -Uri "https://$instanceName/api/users/access-token" -Headers $header 
+                    
+                    $accessToken = $response.AccessToken
+                    
+                    $user = $OctopusParameters["Project.Docker.Account.Username"]
+                    $password = $OctopusParameters["Project.Docker.Account.Password"]
+                    
+                    helm registry login registry-1.docker.io -u $user -p $password
+                    
+                    # Install the NFS storage class
+                    helm upgrade --install --atomic `
+                    --repo https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts `
+                    --namespace kube-system `
+                    --version v4.6.0 `
+                    csi-driver-nfs `
+                    csi-driver-nfs
+                    
+                    # Install K8s agent
+                    helm upgrade --install --atomic `
+                    --set agent.acceptEula="Y" `
+                    --set agent.serverUrl="https://$instanceName/" `
+                    --set agent.serverCommsAddresses="{https://polling.$instanceName/}" `
+                    --set agent.space="#{Octopus.Space.Name}" `
+                    --set agent.name="$clusterName" `
+                    --set agent.deploymentTarget.initial.environments="{administration}" `
+                    --set agent.deploymentTarget.initial.tags="{AKS}" `
+                    --set agent.deploymentTarget.initial.tenantedDeploymentParticipation="TenantedOrUntenanted" `
+                    --set agent.deploymentTarget.enabled="true" `
+                    --set agent.bearerToken="$accessToken" `
+                    --set kubernetesMonitor.enabled="true" `
+                    --set kubernetesMonitor.registration.serverApiUrl="https://$instanceName/" `
+                    --set kubernetesMonitor.monitor.serverGrpcUrl="grpc://$($instanceName):8443" `
+                    --set kubernetesMonitor.registration.spaceId="#{Octopus.Space.Id}" `
+                    --set kubernetesMonitor.registration.machineName="$clusterName" `
+                    --set kubernetesMonitor.registration.serverAccessToken="$accessToken" `
+                    --set imagePullSecrets[0].name="dockerhub" `
+                    --version "2.*.*" `
+                    --create-namespace --namespace $namespace `
+                    $installName `
+                    oci://registry-1.docker.io/octopusdeploy/kubernetes-agent
+                    
+                    # allow time for target to register
+                    Start-Sleep -Seconds 300
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
+
+            container {
+                feed = "docker-hub"
+                image = "octopusdeploy/worker-tools:6.5.0-ubuntu.22.04"
+            }
+        }
+    }
+}
