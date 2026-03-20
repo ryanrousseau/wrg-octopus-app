@@ -3,3 +3,9 @@ variable "Project.Octopus.Account" {
 
     value "octopus-configuration-manager" {}
 }
+
+variable "Project.Docker.Account" {
+    type = "UsernamePasswordAccount"
+
+    value "docker-hub" {}
+}
