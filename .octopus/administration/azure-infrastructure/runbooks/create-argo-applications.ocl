@@ -11,4 +11,67 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    step "deploy-kubernetes-yaml" {
+        name = "Deploy Kubernetes YAML"
+        properties = {
+            Octopus.Action.TargetRoles = "AKS"
+        }
+
+        action {
+            action_type = "Octopus.KubernetesDeployRawYaml"
+            properties = {
+                Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+                Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+                Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+                Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+                Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: ApplicationSet
+                    metadata:
+                      name: cluster-git
+                    spec:
+                      goTemplate: true
+                      goTemplateOptions: ["missingkey=error"]
+                      generators:
+                        # matrix 'parent' generator
+                        - matrix:
+                            generators:
+                              - list:
+                                elements:
+                                - name: ach-router
+                                  instance: wrg
+                                  space: nci
+                                - name: swift-bridge
+                                  instance: wrg
+                                  space: nci
+                                - name: instant-pay-gateway
+                                  instance: wrg
+                                  space: nci
+                              - list:
+                                elements:
+                                - environment: development
+                                - environment: qa
+                                - environment: production
+                    
+                      template:
+                        metadata:
+                          name: '{{.name}}-{{.environment}}'
+                        spec:
+                          project: '{{.instance}}-{{.space}}'
+                          source:
+                            repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                            targetRevision: HEAD
+                            path: 'manifests/{{.space}}/{{.name}}/{{.environment}}'
+                          destination:
+                            server: https://kubernetes.default.svc
+                            namespace: '{{.instance}}-{{.space}}-{{.environment}}'
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+            }
+            worker_pool = "hosted-windows"
+            worker_pool_variable = ""
+        }
+    }
+}
