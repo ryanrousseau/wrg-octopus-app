@@ -26,6 +26,41 @@ process {
         }
     }
 
+    step "create-docker-registry-secret" {
+        name = "Create docker registry secret"
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    # Get project variables
+                    $clusterName = "demo-octopus-app-aks-main"
+                    $resourceGroup = "demo.octopus.app"
+                    $namespace = "oa-wrg-octopus-app"
+                    
+                    # Get credential for AKS cluster
+                    $env:KUBECONFIG = "$PWD/config"
+                    az aks get-credentials --name $clusterName --resource-group $resourceGroup
+                    
+                    kubectl create namespace $namespace
+                    
+                    kubectl delete secret -n $namespace docker-registry dockerhub --ignore-not-found
+                    
+                    kubectl create secret -n $namespace docker-registry dockerhub `
+                      --docker-server=https://index.docker.io `
+                      --docker-username=$($OctopusParameters["Project.Docker.Account.Username"]) `
+                      --docker-password=$($OctopusParameters["Project.Docker.Account.Password"])
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
+        }
+    }
+
     step "register-cluster-as-a-target" {
         name = "Register cluster as a target"
 
