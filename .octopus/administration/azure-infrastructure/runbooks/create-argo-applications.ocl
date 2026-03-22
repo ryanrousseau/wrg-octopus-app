@@ -29,7 +29,7 @@ process {
                     apiVersion: argoproj.io/v1alpha1
                     kind: ApplicationSet
                     metadata:
-                      name: cluster-git
+                      name: wrg-nci
                     spec:
                       goTemplate: true
                       goTemplateOptions: ["missingkey=error"]
@@ -68,6 +68,7 @@ process {
                             namespace: '{{.instance}}-{{.space}}-{{.environment}}'
                     
                     EOT
+                Octopus.Action.KubernetesContainers.Namespace = "argocd"
                 Octopus.Action.Script.ScriptSource = "Inline"
             }
             worker_pool = "hosted-windows"
