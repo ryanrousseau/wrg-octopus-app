@@ -1,0 +1,14 @@
+name = "Create argo applications the hard way"
+default_guided_failure_mode = "EnvironmentDefault"
+description = ""
+multi_tenancy_mode = "TenantedOrUntenanted"
+
+connectivity_policy {
+    allow_deployments_to_no_targets = true
+}
+
+run_retention_policy {
+    type = "Default"
+}
+
+process {}
