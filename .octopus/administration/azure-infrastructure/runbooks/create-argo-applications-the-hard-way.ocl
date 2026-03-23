@@ -34,7 +34,7 @@ process {
                         argo.octopus.com/project: "ach-router"
                         argo.octopus.com/environment: "development"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -58,7 +58,7 @@ process {
                         argo.octopus.com/project: "ach-router"
                         argo.octopus.com/environment: "qa"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -82,7 +82,7 @@ process {
                         argo.octopus.com/project: "ach-router"
                         argo.octopus.com/environment: "production"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -106,7 +106,7 @@ process {
                         argo.octopus.com/project: "swift-bridge"
                         argo.octopus.com/environment: "development"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -130,7 +130,7 @@ process {
                         argo.octopus.com/project: "swift-bridge"
                         argo.octopus.com/environment: "qa"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -154,7 +154,7 @@ process {
                         argo.octopus.com/project: "swift-bridge"
                         argo.octopus.com/environment: "production"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -178,7 +178,7 @@ process {
                         argo.octopus.com/project: "instant-pay-gateway"
                         argo.octopus.com/environment: "development"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -202,7 +202,7 @@ process {
                         argo.octopus.com/project: "instant-pay-gateway"
                         argo.octopus.com/environment: "qa"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
@@ -226,7 +226,7 @@ process {
                         argo.octopus.com/project: "instant-pay-gateway"
                         argo.octopus.com/environment: "production"
                     spec:
-                      project: nic
+                      project: nci
                       source:
                          repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
                          targetRevision: HEAD
