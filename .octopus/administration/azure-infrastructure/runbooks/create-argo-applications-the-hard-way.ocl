@@ -11,4 +11,243 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    step "deploy-kubernetes-yaml" {
+        name = "Deploy Kubernetes YAML"
+        properties = {
+            Octopus.Action.TargetRoles = "AKS"
+        }
+
+        action {
+            action_type = "Octopus.KubernetesDeployRawYaml"
+            properties = {
+                Octopus.Action.Kubernetes.DeploymentTimeout = "180"
+                Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+                Octopus.Action.Kubernetes.ServerSideApply.Enabled = "True"
+                Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "True"
+                Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: ach-router-development
+                      annotations:
+                        argo.octopus.com/project: "ach-router"
+                        argo.octopus.com/environment: "development"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/ach-router/development
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ar-development
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: ach-router-qa
+                      annotations:
+                        argo.octopus.com/project: "ach-router"
+                        argo.octopus.com/environment: "qa"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/ach-router/qa
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ar-qa
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: ach-router-production
+                      annotations:
+                        argo.octopus.com/project: "ach-router"
+                        argo.octopus.com/environment: "production"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/ach-router/production
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ar-production
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: swift-bridge-development
+                      annotations:
+                        argo.octopus.com/project: "swift-bridge"
+                        argo.octopus.com/environment: "development"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/swift-bridge/development
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-sb-development
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: swift-bridge-qa
+                      annotations:
+                        argo.octopus.com/project: "swift-bridge"
+                        argo.octopus.com/environment: "qa"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/swift-bridge/qa
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-sb-qa
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: swift-bridge-production
+                      annotations:
+                        argo.octopus.com/project: "swift-bridge"
+                        argo.octopus.com/environment: "production"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/swift-bridge/production
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-sb-production
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: instant-pay-gateway-development
+                      annotations:
+                        argo.octopus.com/project: "instant-pay-gateway"
+                        argo.octopus.com/environment: "development"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/instant-pay-gateway/development
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ipg-development
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: instant-pay-gateway-qa
+                      annotations:
+                        argo.octopus.com/project: "instant-pay-gateway"
+                        argo.octopus.com/environment: "qa"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/instant-pay-gateway/qa
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ipg-qa
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    ---
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Application
+                    metadata:
+                      name: instant-pay-gateway-production
+                      annotations:
+                        argo.octopus.com/project: "instant-pay-gateway"
+                        argo.octopus.com/environment: "production"
+                    spec:
+                      project: nic
+                      source:
+                         repoURL: https://github.com/OctopusSolutionsEngineering/demo-app-argo-sources.git
+                         targetRevision: HEAD
+                         path: manifests/nci/instant-pay-gateway/production
+                      destination:
+                        server: https://kubernetes.default.svc
+                        namespace: nci-ipg-production
+                      syncPolicy:
+                        automated:  
+                          prune: true
+                          selfHeal: true
+                        syncOptions:
+                        - Validate=false
+                        - CreateNamespace=true
+                    
+                    EOT
+                Octopus.Action.KubernetesContainers.Namespace = "argocd"
+                Octopus.Action.Script.ScriptSource = "Inline"
+            }
+            worker_pool = "hosted-windows"
+            worker_pool_variable = ""
+        }
+    }
+}
