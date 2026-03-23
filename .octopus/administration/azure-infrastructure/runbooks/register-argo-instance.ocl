@@ -11,4 +11,236 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    process_template "authenticate" {
+        name = "Authenticate"
+        process_template_slug = "octopus-authenticate-with-oidc"
+        version_mask = "1.X"
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.OidcAccount" {
+            value = "Project.Octopus.Account"
+        }
+
+        parameter "Template.Octopus.AuthenticateWithOIDC.WorkerPool" {
+            value = "WorkerPools-22"
+        }
+    }
+
+    step "register-argo-instance" {
+        name = "Register Argo instance"
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    # Fix ANSI Color on PWSH Core issues when displaying objects
+                    if ($PSEdition -eq "Core") {
+                        $PSStyle.OutputRendering = "PlainText"
+                    }
+                    
+                    
+                    $token = $OctopusParameters['Octopus.Action[Authenticate-Authenticate with OIDC].Output.AccessToken']
+                    $baseUri = $OctopusParameters['Octopus.Web.ServerUri']
+                    $header = @{ "Authorization" = "Bearer $token" }
+                    
+                    
+                    function Get-Index
+                    {
+                        param(
+                            $StringArray,
+                            $StartsWithMatch
+                        )
+                    
+                        for($i = 0; $i -lt $StringArray.Count; $i++)
+                        {
+                            if ($StringArray[$i].Trim().StartsWith($StartsWithMatch))
+                            {
+                                return $i
+                            }
+                        }
+                    
+                        return -1;
+                    }
+                    
+                    $clusterName = "demo-octopus-app-aks-main"
+                    $resourceGroupName = "demo.octopus.app"
+                    $tenantSpaceName = "New Cascadia Imports"
+                    $tenantSlug = "nci"
+                    $spaceSlugPassword = $OctopusParameters['Project.ArgoCD.SpaceSlug.Password']
+                    
+                    # Get space slug
+                    $spaces = Invoke-RestMethod -Method Get -Uri "$($OctopusParameters['Octopus.Web.ServerUri'])/api/spaces/all" -Headers $header
+                    $space = ($spaces | Where-Object { $_.Name -eq $tenantSpaceName })
+                    $spaceSlug = $space.Slug
+                    
+                    # Get context credentials
+                    $env:KUBECONFIG = "$PWD/config"
+                    az aks get-credentials --name $clusterName --resource-group $resourceGroupName
+                    
+                    # Install argo cd
+                    $adminPassword = (kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+                    
+                    # Install argocd cli
+                    curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && `
+                        install -m 555 argocd-linux-amd64 /usr/local/bin/argocd && `
+                        rm argocd-linux-amd64
+                    
+                    # Get services from the envoy namespace
+                    $services = (kubectl get services -n envoy-gateway-system -o json | ConvertFrom-Json)
+                    $externalIp = $null
+                    
+                    # Get the loadbalancer external ip address
+                    foreach ($service in $services.items)
+                    {
+                      if ($null -ne $service.status.loadBalancer)
+                      {
+                        $externalIp = $service.status.loadBalancer.ingress.ip
+                        break
+                      }
+                    }
+                    
+                    # Log in to argo server with cli
+                    argocd login $externalIp --username "admin" --password "$adminPassword" --insecure
+                    
+                    # Check to see if project already exists
+                    Write-Host "Checking to see if Argo CD project $spaceSlug exists ..."
+                    $projects = (argocd proj list --output json) | ConvertFrom-Json
+                    
+                    if ($null -eq ($projects | Where-Object { $_.metadata.name -eq $spaceSlug }))
+                    {
+                        # Create argocd project
+                        Write-Host "Creating Argo CD project $spaceSlug ..."
+                        argocd proj create $spaceSlug `
+                            --description "NCI Argo CD Project" 
+                    
+                        Write-Host "Creating role for Argo CD project $spaceSlug ..."
+                        argocd proj role create $spaceSlug "$spaceSlug-role" `
+                            --description "Role for NCI Argo CD Project" 
+                    
+                        Write-Host "Configuring permissions for Argo CD project $spaceSlug ..."
+                        argocd proj add-destination $spaceSlug "*" "*"
+                        argocd proj add-source $spaceSlug "*" #"*"
+                        argocd proj allow-cluster-resource $spaceSlug "*" "*"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "applications"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "clusters"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "repositories"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "logs"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "applicationsets"
+                        argocd proj role add-policy $spaceSlug "$spaceSlug-role" --action "*" --permission allow --object "*" --resource "exec"
+                    
+                        
+                        # Get the configmap
+                        $configMap = kubectl get configmap argocd-rbac-cm -n argocd -o yaml
+                        $configMap = [System.Collections.ArrayList] ($configMap.Split([Environment]::NewLine))
+                        $dataIndex = Get-Index -StringArray $configMap -StartsWithMatch "data:"
+                    
+                        if ($dataIndex -eq -1)
+                        {
+                            Write-Host "Adding data section to argocd-rbac-cm ..."
+                            $configMap.Add("data:")
+                            $dataIndex = ($configMap.Count - 1)
+                        }
+                    
+                    
+                        $policyCsvIndex = Get-Index -StringArray $configMap -StartsWithMatch "policy.csv:"
+                    
+                        if ($configMap -notcontains $spaceSlug)
+                        {
+                            if ($policyCsvIndex -eq -1)
+                            {
+                                Write-Host "Adding policy.csv section to argocd-rbac-cm ..."
+                                $configMap.Insert(($dataIndex + 1), "  policy.csv: |")
+                                $policyCsvIndex = $dataIndex + 1
+                            }
+                    
+                             $configMap.Insert(($policyCsvIndex + 1), "    p, role:$($spaceSlug)-role, clusters, get, *, allow")
+                             $configMap.Insert(($policyCsvIndex + 1), "    g, $($spaceSlug), role:$($spaceSlug)-role")
+                    
+                            Set-Content -Path "$PWD/argocd-rbac-cm.yaml" -value $configMap
+                    
+                            # Update the configmap
+                            kubectl apply -f "$PWD/argocd-rbac-cm.yaml"
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "Argo CD project $spaceSlug already exists. Skipping creation."
+                    }   
+                    
+                    
+                    # Get the argocd config map
+                    $argocdConfigMap = (kubectl get configmap argocd-cm -n argocd -o json) | ConvertFrom-Json
+                    
+                    # Check for user
+                    if ($null -eq $argocdConfigMap.data."accounts.$spaceSlug")
+                    {
+                        # Insert the service account
+                        Write-Host "Creating Argo CD service account for $spaceSlug ..."
+                        $argoCdConfigMap.data | Add-Member -NotePropertyName "accounts.$spaceSlug" -NotePropertyValue "apiKey, login"
+                    
+                        Set-Content -Path "$PWD/argocd-cm-updated.json" -Value ($argocdConfigMap | ConvertTo-Json -Depth 10)
+                        kubectl apply -f "$PWD/argocd-cm-updated.json"
+                    
+                        # Set account password
+                        Write-Host "Setting password for Argo CD service account $spaceSlug ..."
+                        argocd account update-password --new-password "$spaceSlugPassword" --current-password "$adminPassword" --account "$spaceSlug"
+                    
+                        # Assign role to user
+                        Write-Host "Assigning role to Argo CD service account $spaceSlug ..."
+                        argocd proj role add-group $spaceSlug "$spaceSlug-role" $spaceSlug
+                    }
+                    else
+                    {
+                        Write-Host "Argo CD service account for $spaceSlug already exists. Skipping creation."
+                    }   
+                    
+                    # Logout of admin account
+                    argocd logout $externalIp
+                    
+                    # Login to argo with space slug
+                    Write-Host "Logging in to Argo CD with $spaceSlug ..."
+                    argocd login $externalIp --username "$spaceSlug" --password "$spaceSlugPassword" --insecure
+                    $argocdToken = argocd account generate-token
+                    
+                    # Get access token
+                    $baseUri = $OctopusParameters['Octopus.Web.ServerUri']
+                    $response = Invoke-RestMethod -Method Post -Uri "$($baseUri)/api/users/access-token" -Headers $header 
+                    $accessToken = $response.AccessToken
+                    
+                    # Get environment list
+                    $environments = Invoke-RestMethod -Method Get -Uri "$($baseUri)/api/$($space.Id)/Environments/all" -Headers $header 
+                    
+                    $environmentList = @()
+                    foreach ($environment in $environments)
+                    {
+                      $environmentList += @($environment.slug)
+                    }
+                    
+                    # Install helm chart
+                    helm upgrade --install --atomic `
+                    --create-namespace --namespace octo-argo-gateway-$tenantSlug `
+                    --version "*.*" `
+                    --set registration.octopus.name="demo-octopus-app-aks-main" `
+                    --set registration.octopus.serverApiUrl="$baseUri" `
+                    --set registration.octopus.serverAccessToken="$accessToken" `
+                    --set registration.octopus.environments="{$($environmentList -join ",")}" `
+                    --set registration.octopus.spaceId="$($space.Id)" `
+                    --set registration.argocd.webUiUrl="https://argocd.demo.octopussamples.com" `
+                    --set gateway.octopus.serverGrpcUrl="grpc://wrg.octopus.app:8443" `
+                    --set gateway.argocd.serverGrpcUrl="grpc://argocd-server.argocd.svc.cluster.local" `
+                    --set gateway.argocd.insecure="true" `
+                    --set gateway.argocd.plaintext="false" `
+                    --set gateway.argocd.authenticationToken="$argocdToken" `
+                    demo-octopus-app-aks-main `
+                    oci://registry-1.docker.io/octopusdeploy/octopus-argocd-gateway-chart
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
+        }
+    }
+}
