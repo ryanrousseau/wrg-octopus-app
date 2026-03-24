@@ -232,7 +232,7 @@ process {
                     --set gateway.argocd.insecure="true" `
                     --set gateway.argocd.plaintext="false" `
                     --set gateway.argocd.authenticationToken="$argocdToken" `
-                    demo-octopus-app-aks-main `
+                    octo-argo-gateway-$tenantSlug `
                     oci://registry-1.docker.io/octopusdeploy/octopus-argocd-gateway-chart
                     
                     EOT
