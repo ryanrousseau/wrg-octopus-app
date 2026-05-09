@@ -13,4 +13,33 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    step "enable-workload-identity-on-aks" {
+        name = "Enable Workload Identity on AKS"
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    # Enable OIDC and Workload Identity (one-time per cluster)
+                    az aks update \
+                      --resource-group demo.octopus.app \
+                      --name demo-octopus-app-main \
+                      --enable-oidc-issuer \
+                      --enable-workload-identity
+                    
+                    # Get the OIDC issuer URL
+                    OIDC_ISSUER=$(az aks show \
+                      --resource-group demo.octopus.app \
+                      --name demo-octopus-app-main \
+                      --query "oidcIssuerProfile.issuerUrl" -o tsv)
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "Bash"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
+        }
+    }
+}
