@@ -23,16 +23,17 @@ process {
                 Octopus.Action.Azure.AccountId = "demo-octopus-app"
                 Octopus.Action.Script.ScriptBody = <<-EOT
                     # Enable OIDC and Workload Identity (one-time per cluster)
+                    
                     az aks update \
                       --resource-group demo.octopus.app \
-                      --name demo-octopus-app-main \
+                      --name demo-octopus-app-aks-main \
                       --enable-oidc-issuer \
                       --enable-workload-identity
                     
                     # Get the OIDC issuer URL
                     OIDC_ISSUER=$(az aks show \
                       --resource-group demo.octopus.app \
-                      --name demo-octopus-app-main \
+                      --name demo-octopus-app-aks-main \
                       --query "oidcIssuerProfile.issuerUrl" -o tsv)
                     EOT
                 Octopus.Action.Script.ScriptSource = "Inline"
