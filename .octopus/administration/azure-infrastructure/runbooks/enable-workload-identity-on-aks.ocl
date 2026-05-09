@@ -24,19 +24,92 @@ process {
                 Octopus.Action.Script.ScriptBody = <<-EOT
                     # Enable OIDC and Workload Identity (one-time per cluster)
                     
+                    export RESOURCE_GROUP=demo.octopus.app
+                    export CLUSTER=demo-octopus-app-aks-main
+                    
                     az aks update \
-                      --resource-group demo.octopus.app \
-                      --name demo-octopus-app-aks-main \
+                      --resource-group $RESOURCE_GROUP \
+                      --name $CLUSTER \
                       --enable-oidc-issuer \
-                      --enable-workload-identity
+                      --enable-workload-identity > /dev/null
                     
                     # Get the OIDC issuer URL
                     OIDC_ISSUER=$(az aks show \
-                      --resource-group demo.octopus.app \
-                      --name demo-octopus-app-aks-main \
+                      --resource-group $RESOURCE_GROUP \
+                      --name $CLUSTER \
                       --query "oidcIssuerProfile.issuerUrl" -o tsv)
                     
                     echo "oidc_issuer = $OIDC_ISSUER"
+                    
+                    ##
+                    
+                    IDENTITY_NAME="weather-agent-identity"
+                    LOCATION=westus2
+                    
+                    az identity create \
+                      --name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --location $LOCATION
+                    
+                    CLIENT_ID=$(az identity show \
+                      --name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --query clientId -o tsv)
+                    
+                    PRINCIPAL_ID=$(az identity show \
+                      --name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --query principalId -o tsv)
+                    
+                    ##
+                    
+                    export KEY_VAULT_NAME=demo-octopus-app
+                    
+                    KV_SCOPE=$(az keyvault show \
+                      --name $KEY_VAULT_NAME \
+                      --query id -o tsv)
+                    
+                    az role assignment create \
+                      --role "Key Vault Secrets User" \
+                      --assignee-object-id $PRINCIPAL_ID \
+                      --assignee-principal-type ServicePrincipal \
+                      --scope $KV_SCOPE
+                    
+                    ##
+                    
+                    NAMESPACE="weather-agent-development"
+                    SERVICE_ACCOUNT="weather-agent"
+                    
+                    az identity federated-credential create \
+                      --name "demo-agent-federation" \
+                      --identity-name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --issuer $OIDC_ISSUER \
+                      --subject "system:serviceaccount:${NAMESPACE}:${SERVICE_ACCOUNT}" \
+                      --audiences "api://AzureADTokenExchange"
+                    
+                    NAMESPACE="weather-agent-qa"
+                    
+                    az identity federated-credential create \
+                      --name "demo-agent-federation" \
+                      --identity-name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --issuer $OIDC_ISSUER \
+                      --subject "system:serviceaccount:${NAMESPACE}:${SERVICE_ACCOUNT}" \
+                      --audiences "api://AzureADTokenExchange"
+                    
+                    NAMESPACE="weather-agent-production"
+                    
+                    az identity federated-credential create \
+                      --name "demo-agent-federation" \
+                      --identity-name $IDENTITY_NAME \
+                      --resource-group $RESOURCE_GROUP \
+                      --issuer $OIDC_ISSUER \
+                      --subject "system:serviceaccount:${NAMESPACE}:${SERVICE_ACCOUNT}" \
+                      --audiences "api://AzureADTokenExchange"
+                    
+                    echo "✅ Use this Client ID in your ServiceAccount annotation:"
+                    echo "   $CLIENT_ID"
                     EOT
                 Octopus.Action.Script.ScriptSource = "Inline"
                 Octopus.Action.Script.Syntax = "Bash"
