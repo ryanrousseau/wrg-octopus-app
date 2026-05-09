@@ -35,6 +35,8 @@ process {
                       --resource-group demo.octopus.app \
                       --name demo-octopus-app-aks-main \
                       --query "oidcIssuerProfile.issuerUrl" -o tsv)
+                    
+                    echo "oidc_issuer = $OIDC_ISSUER"
                     EOT
                 Octopus.Action.Script.ScriptSource = "Inline"
                 Octopus.Action.Script.Syntax = "Bash"
