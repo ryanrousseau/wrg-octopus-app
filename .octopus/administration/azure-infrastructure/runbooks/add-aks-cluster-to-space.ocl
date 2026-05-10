@@ -27,9 +27,9 @@ process {
     }
 
     step "run-an-azure-script" {
-        name = "Run an Azure Script"
+        name = "Register Kubernetes agent"
 
-        action {
+        action "register-kubernetes-agent" {
             action_type = "Octopus.AzurePowerShell"
             properties = {
                 Octopus.Action.Azure.AccountId = "demo-octopus-app"
@@ -222,6 +222,76 @@ process {
                 feed = "docker-hub"
                 image = "octopusdeploy/worker-tools:6.5.0-ubuntu.22.04"
             }
+        }
+    }
+
+    step "register-klos" {
+        name = "Register KLOS"
+        properties = {
+            Octopus.Action.TargetRoles = "AKS"
+        }
+
+        action {
+            action_type = "Octopus.AzurePowerShell"
+            properties = {
+                Octopus.Action.Azure.AccountId = "demo-octopus-app"
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    param([string]$namespace)
+                    
+                    # Get project variables
+                    $instanceName = "wrg.octopus.app"
+                    
+                    # Get Variables
+                    $octopusUrl = $OctopusParameters["Octopus.Web.ServerUri"]
+                    $token = $OctopusParameters["Octopus.Action[Authenticate-Authenticate with OIDC].Output.AccessToken"]
+                    $workerPoolName = "Hosted Ubuntu"
+                    $tenantSpaceName = $OctopusParameters["Octopus.Deployment.Tenant.Name"]
+                    $machineName = "demo-octopus-app-aks-main" #$OctopusParameters['Project.Azure.AKS.Cluster.Name']
+                    $resourceGroup = "demo.octopus.app"
+                    
+                    # Get credential for AKS cluster
+                    $env:KUBECONFIG = "$PWD/config"
+                    az aks get-credentials --name $clusterName --resource-group $resourceGroup
+                    
+                    # Get spaces
+                    Write-Host "Getting list of spaces on instance ..."
+                    $spaces = Invoke-RestMethod -Method Get -Uri "$octopusUrl/api/spaces/all" -Headers $header
+                    $adminSpace = $spaces | Where-Object {$_.Name -eq "Administration"}
+                    $tenantSpace = $spaces | Where-Object {$_.Name -eq $tenantSpaceName}
+                    $spaceId = $tenantSpace.Id
+                    
+                    # Get access token
+                    $header = @{ "Authorization" = "Bearer " + $token }
+                    $response = Invoke-RestMethod -Method Post -Uri "$octopusUrl/api/users/access-token" -Headers $header
+                    
+                    $accessToken = $response.AccessToken
+                    
+                    $releaseName = "monitor-" + $spaceId.ToLower() + "-$suffix"
+                    
+                    $user = $OctopusParameters["Project.DockerHub.User.Username"]
+                    $password = $OctopusParameters["Project.DockerHub.User.Password"]
+                    
+                    helm registry login registry-1.docker.io -u $user -p $password
+                    
+                    # Install K8s agent
+                    helm upgrade --install --atomic `
+                    --set registration.spaceId="$spaceId" `
+                    --set registration.serverApiUrl="https://$instanceName/" `
+                    --set monitor.serverGrpcUrl="grpc://$($instanceName):8443" `
+                    --set registration.machineName="$clusterName" `
+                    --set registration.serverAccessToken="$accessToken" `
+                    --set imagePullSecrets[0].name="dockerhub" `
+                    --version "0.*.*" `
+                    --create-namespace --namespace $namespace `
+                    $releaseName `
+                    oci://registry-1.docker.io/octopusdeploy/kubernetes-monitor-chart
+                    
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-ubuntu"
         }
     }
 }
