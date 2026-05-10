@@ -242,6 +242,7 @@ process {
                     $workerPoolName = "Hosted Ubuntu"
                     $tenantSpaceName = $OctopusParameters["Octopus.Deployment.Tenant.Name"]
                     $machineName = "demo-octopus-app-aks-main" #$OctopusParameters['Project.Azure.AKS.Cluster.Name']
+                    $clusterName = $machineName
                     $resourceGroup = "demo.octopus.app"
                     
                     # Get credential for AKS cluster
