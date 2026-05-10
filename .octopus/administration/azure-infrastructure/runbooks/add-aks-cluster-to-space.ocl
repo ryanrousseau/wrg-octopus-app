@@ -268,8 +268,8 @@ process {
                     
                     $releaseName = "monitor-" + $spaceId.ToLower() + "-$suffix"
                     
-                    $user = $OctopusParameters["Project.DockerHub.User.Username"]
-                    $password = $OctopusParameters["Project.DockerHub.User.Password"]
+                    $user = $OctopusParameters["Project.Docker.Account.Username"]
+                    $password = $OctopusParameters["Project.Docker.Account.Password"]
                     
                     helm registry login registry-1.docker.io -u $user -p $password
                     
