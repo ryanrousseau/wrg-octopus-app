@@ -81,7 +81,7 @@ process {
                     SERVICE_ACCOUNT="weather-agent"
                     
                     az identity federated-credential create \
-                      --name "demo-agent-federation" \
+                      --name $NAMESPACE \
                       --identity-name $IDENTITY_NAME \
                       --resource-group $RESOURCE_GROUP \
                       --issuer $OIDC_ISSUER \
@@ -91,7 +91,7 @@ process {
                     NAMESPACE="weather-agent-qa"
                     
                     az identity federated-credential create \
-                      --name "demo-agent-federation" \
+                      --name $NAMESPACE \
                       --identity-name $IDENTITY_NAME \
                       --resource-group $RESOURCE_GROUP \
                       --issuer $OIDC_ISSUER \
@@ -101,7 +101,7 @@ process {
                     NAMESPACE="weather-agent-production"
                     
                     az identity federated-credential create \
-                      --name "demo-agent-federation" \
+                      --name $NAMESPACE \
                       --identity-name $IDENTITY_NAME \
                       --resource-group $RESOURCE_GROUP \
                       --issuer $OIDC_ISSUER \
