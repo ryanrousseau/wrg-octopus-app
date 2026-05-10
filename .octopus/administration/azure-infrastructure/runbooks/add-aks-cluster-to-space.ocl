@@ -235,6 +235,7 @@ process {
                 Octopus.Action.Script.ScriptBody = <<-EOT
                     # Get project variables
                     $instanceName = "wrg.octopus.app"
+                    $namespace = 
                     
                     # Get Variables
                     $octopusUrl = $OctopusParameters["Octopus.Web.ServerUri"]
@@ -244,6 +245,11 @@ process {
                     $machineName = "demo-octopus-app-aks-main" #$OctopusParameters['Project.Azure.AKS.Cluster.Name']
                     $clusterName = $machineName
                     $resourceGroup = "demo.octopus.app"
+                    
+                    $slug = $instanceName.Replace(".", "-")
+                    $namespace = "oa-$slug"
+                    $installName = $namespace
+                    
                     
                     # Get credential for AKS cluster
                     $env:KUBECONFIG = "$PWD/config"
@@ -263,7 +269,7 @@ process {
                     
                     $accessToken = $response.AccessToken
                     
-                    $releaseName = "monitor-" + $spaceId.ToLower() + "-$suffix"
+                    $releaseName = "monitor-" + $spaceId.ToLower()
                     
                     $user = $OctopusParameters["Project.Docker.Account.Username"]
                     $password = $OctopusParameters["Project.Docker.Account.Password"]
