@@ -227,9 +227,6 @@ process {
 
     step "register-klos" {
         name = "Register KLOS"
-        properties = {
-            Octopus.Action.TargetRoles = "AKS"
-        }
 
         action {
             action_type = "Octopus.AzurePowerShell"
