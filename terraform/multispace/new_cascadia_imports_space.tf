@@ -40,15 +40,15 @@ resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
   name        = "Hotfix"
   space_id    = module.new_cascadia_imports_space.id
 
-  release_retention_policy {
+  release_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 30
-    should_keep_forever = false
     unit                = "Days"
   }
 
-  tentacle_retention_policy {
+  tentacle_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 3
-    should_keep_forever = false
     unit                = "Items"
   }
 
@@ -65,18 +65,6 @@ resource "octopusdeploy_lifecycle" "hotfix_lifecycle" {
     is_priority_phase            = true
     optional_deployment_targets  = [module.new_cascadia_imports_space_dev_test_prod.prod_env_id]
     name                         = module.new_cascadia_imports_space_dev_test_prod.prod_env_name
-
-    release_retention_policy {
-      quantity_to_keep    = 180
-      should_keep_forever = false
-      unit                = "Days"
-    }
-
-    tentacle_retention_policy {
-      quantity_to_keep    = 3
-      should_keep_forever = false
-      unit                = "Items"
-    }
   }
 }
 
@@ -85,15 +73,15 @@ resource "octopusdeploy_lifecycle" "development_lifecycle" {
   name        = "Development"
   space_id    = module.new_cascadia_imports_space.id
 
-  release_retention_policy {
+  release_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 30
-    should_keep_forever = false
     unit                = "Days"
   }
 
-  tentacle_retention_policy {
+  tentacle_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 3
-    should_keep_forever = false
     unit                = "Items"
   }
 
@@ -109,15 +97,15 @@ resource "octopusdeploy_lifecycle" "test_lifecycle" {
   name        = "Test"
   space_id    = module.new_cascadia_imports_space.id
 
-  release_retention_policy {
+  release_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 30
-    should_keep_forever = false
     unit                = "Days"
   }
 
-  tentacle_retention_policy {
+  tentacle_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 3
-    should_keep_forever = false
     unit                = "Items"
   }
 
@@ -133,15 +121,15 @@ resource "octopusdeploy_lifecycle" "production_lifecycle" {
   name        = "Production"
   space_id    = module.new_cascadia_imports_space.id
 
-  release_retention_policy {
+  release_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 30
-    should_keep_forever = false
     unit                = "Days"
   }
 
-  tentacle_retention_policy {
+  tentacle_retention_with_strategy {
+    strategy = "Count"
     quantity_to_keep    = 3
-    should_keep_forever = false
     unit                = "Items"
   }
 
